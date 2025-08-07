@@ -1,0 +1,69 @@
+W25Q128JV Memory Map
+===================
+
+Flash Specifications:
+- Total Size: 16 MB (0x01000000 bytes)
+- Sector Size: 4096 bytes (0x1000)
+- Page Size: 256 bytes (0x0100)
+- Block Size: 64 KB (0x00010000)
+
+Resource Memory Map:
+===================
+
+Resource: boot_screen
+  Address: 0x00000000 - 0x0001ADFF
+  Size: 110,080 bytes
+  Sectors: 0-26
+  Description: 320x172 RGB565 boot screen bitmap
+
+Resource: font_bitmap
+  Address: 0x00020000 - 0x0021FFFF
+  Size: 2,097,152 bytes
+  Sectors: 32-543
+  Description: WenQuanYi 12px bitmap font data (Chinese + ASCII)
+
+Resource: ui_graphics
+  Address: 0x00220000 - 0x0041FFFF
+  Size: 2,097,152 bytes
+  Sectors: 544-1055
+  Description: UI graphics and icons
+
+Resource: app_data
+  Address: 0x00420000 - 0x0071FFFF
+  Size: 3,145,728 bytes
+  Sectors: 1056-1823
+  Description: Application data storage
+
+Resource: user_config
+  Address: 0x00720000 - 0x0072FFFF
+  Size: 65,536 bytes
+  Sectors: 1824-1839
+  Description: User configuration and settings
+
+Resource: log_storage
+  Address: 0x00730000 - 0x0074FFFF
+  Size: 131,072 bytes
+  Sectors: 1840-1871
+  Description: System and error logs
+
+Resource: firmware_update
+  Address: 0x00750000 - 0x007CFFFF
+  Size: 524,288 bytes
+  Sectors: 1872-1999
+  Description: Firmware update storage
+
+Resource: reserved
+  Address: 0x007D0000 - 0x00FFFFFF
+  Size: 8,585,216 bytes
+  Sectors: 2000-4095
+  Description: Reserved for future use
+
+Flash Programming Commands:
+===========================
+
+# Program boot_screen
+st-flash write boot_screen_320x172.bin 0x00000000
+
+# Program font_bitmap
+st-flash write font_output/font_bitmap.bin 0x00020000
+

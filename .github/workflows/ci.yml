@@ -1,0 +1,194 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "feat/*", "fix/*", "docs/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo check (main project)
+        run: cargo check
+
+      - name: Run cargo check (flash_programmer)
+        run: cd flash_programmer && cargo check
+
+      - name: Run cargo check (flash_test_image)
+        run: cd flash_test_image && cargo check --target thumbv7em-none-eabihf
+
+      - name: Run cargo check (tests)
+        run: cargo check --tests
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo test (main project)
+        run: cargo test
+
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run cargo fmt (main project)
+        run: cargo fmt --all -- --check
+
+      - name: Run cargo fmt (flash_programmer)
+        run: cd flash_programmer && cargo fmt --all -- --check
+
+      - name: Run cargo fmt (flash_test_image)
+        run: cd flash_test_image && cargo fmt --all -- --check
+
+      - name: Run cargo clippy (main project)
+        run: cargo clippy -- -D warnings
+
+      - name: Run cargo clippy (flash_programmer)
+        run: cd flash_programmer && cargo clippy -- -D warnings
+
+      - name: Run cargo clippy (flash_test_image)
+        run: cd flash_test_image && cargo clippy --target thumbv7em-none-eabihf -- -D warnings
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [debug, release]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-build-${{ matrix.profile }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build main project debug
+        if: matrix.profile == 'debug'
+        run: cargo build
+
+      - name: Build main project release
+        if: matrix.profile == 'release'
+        run: cargo build --release
+
+      - name: Build flash_programmer debug
+        if: matrix.profile == 'debug'
+        run: cd flash_programmer && cargo build
+
+      - name: Build flash_programmer release
+        if: matrix.profile == 'release'
+        run: cd flash_programmer && cargo build --release
+
+      - name: Build flash_test_image debug
+        if: matrix.profile == 'debug'
+        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf
+
+      - name: Build flash_test_image release
+        if: matrix.profile == 'release'
+        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf --release
+
+      - name: Check binary size (release only)
+        if: matrix.profile == 'release'
+        run: |
+          cargo install cargo-binutils
+          rustup component add llvm-tools-preview
+          cd flash_programmer && cargo size --release --bin flash_programmer
+          cd ../flash_test_image && cargo size --target thumbv7em-none-eabihf --release --bin flash_test_image
+
+  commit-check:
+    name: Commit Convention Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check commit messages
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.sha }} --verbose

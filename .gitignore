@@ -1,0 +1,236 @@
+# =============================================================================
+# STM32G4 Flash Programmer Project .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rust 编译产物和缓存
+# -----------------------------------------------------------------------------
+# Cargo 编译输出目录
+/target/
+*/target/
+**/target/
+
+# Cargo 锁文件 (对于库项目通常忽略，但对于应用程序可以保留)
+# 这里保留主要的 Cargo.lock，忽略子项目的
+/flash_programmer/Cargo.lock
+/flash_test_image/Cargo.lock
+/bitmap_flasher/Cargo.lock
+
+# Cargo 缓存和临时文件
+**/*.rs.bk
+**/Cargo.lock.bak
+
+# -----------------------------------------------------------------------------
+# 生成的二进制文件和数据文件
+# -----------------------------------------------------------------------------
+# 所有二进制文件都不提交
+*.bin
+
+# 生成的十六进制文件
+*.hex
+
+# 生成的可执行文件
+flash_hello_world
+simulate_main_app
+test_bitmap_colors
+test_hello_world_memory
+
+# 可视化文本文件
+*.visual.txt
+hello_world_visual.txt
+
+# Flash 数据文件
+flash_data.*
+
+# -----------------------------------------------------------------------------
+# Python 相关
+# -----------------------------------------------------------------------------
+# Python 字节码
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python 虚拟环境
+venv/
+env/
+ENV/
+
+# Python 包分发
+*.egg-info/
+dist/
+build/
+
+# -----------------------------------------------------------------------------
+# Node.js 相关
+# -----------------------------------------------------------------------------
+# Node.js 依赖
+node_modules/
+
+# npm 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# -----------------------------------------------------------------------------
+# 嵌入式开发相关
+# -----------------------------------------------------------------------------
+# OpenOCD 和调试器临时文件
+*.log
+openocd.log
+
+# ST-Link 相关
+*.stlink/
+
+# GDB 相关
+.gdb_history
+gdb.txt
+
+# Probe-rs 缓存
+.probe-rs/
+
+# -----------------------------------------------------------------------------
+# IDE 和编辑器文件
+# -----------------------------------------------------------------------------
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IntelliJ IDEA / CLion
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# -----------------------------------------------------------------------------
+# 操作系统相关
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# -----------------------------------------------------------------------------
+# 临时文件和备份
+# -----------------------------------------------------------------------------
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# 日志文件
+*.log
+logs/
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+
+# -----------------------------------------------------------------------------
+# 项目特定的忽略规则
+# -----------------------------------------------------------------------------
+# 输入图像文件 (PNG源文件可能很大)
+screenshot-*.png
+*.png
+!docs/*.png  # 保留文档中的图片
+
+# 测试输出
+test_output/
+output/
+
+# 临时工作目录
+tmp/
+temp/
+
+# 用户配置文件
+.env
+.env.local
+config.local.*
+
+# -----------------------------------------------------------------------------
+# 安全相关
+# -----------------------------------------------------------------------------
+# 密钥和证书
+*.key
+*.pem
+*.crt
+*.p12
+
+# 敏感配置
+secrets.toml
+.secrets

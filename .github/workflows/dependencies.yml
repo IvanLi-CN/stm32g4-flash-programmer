@@ -1,0 +1,156 @@
+name: Dependencies
+
+on:
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit (main project)
+        run: cargo audit
+
+      - name: Run cargo audit (flash_programmer)
+        run: cd flash_programmer && cargo audit
+
+      - name: Run cargo audit (flash_test_image)
+        run: cd flash_test_image && cargo audit
+
+  outdated:
+    name: Check Outdated Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated
+
+      - name: Check outdated dependencies
+        run: |
+          echo "## Main Project Dependencies" > outdated-report.md
+          cargo outdated --format json | jq -r '.dependencies[] | "- \(.name): \(.project) -> \(.latest)"' >> outdated-report.md || echo "No outdated dependencies found" >> outdated-report.md
+          
+          echo "" >> outdated-report.md
+          echo "## Flash Programmer Dependencies" >> outdated-report.md
+          cd flash_programmer && cargo outdated --format json | jq -r '.dependencies[] | "- \(.name): \(.project) -> \(.latest)"' >> ../outdated-report.md || echo "No outdated dependencies found" >> ../outdated-report.md
+          
+          echo "" >> ../outdated-report.md
+          echo "## Flash Test Image Dependencies" >> ../outdated-report.md
+          cd ../flash_test_image && cargo outdated --format json | jq -r '.dependencies[] | "- \(.name): \(.project) -> \(.latest)"' >> ../outdated-report.md || echo "No outdated dependencies found" >> ../outdated-report.md
+
+      - name: Upload outdated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-dependencies-report
+          path: outdated-report.md
+
+  update-lockfile:
+    name: Update Cargo.lock
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+
+      - name: Update Cargo.lock files
+        run: |
+          cargo update
+          cd flash_programmer && cargo update
+          cd ../flash_test_image && cargo update
+
+      - name: Test updated dependencies
+        run: |
+          cargo check
+          cargo test
+          cargo clippy -- -D warnings
+          cd flash_programmer && cargo check && cargo clippy -- -D warnings
+          cd ../flash_test_image && cargo check --target thumbv7em-none-eabihf && cargo clippy --target thumbv7em-none-eabihf -- -D warnings
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update Cargo.lock files'
+          title: 'chore: update Cargo.lock files'
+          body: |
+            This PR updates the Cargo.lock files for all projects.
+
+            ## Changes
+            - Updated main project dependencies
+            - Updated flash_programmer dependencies  
+            - Updated flash_test_image dependencies
+
+            ## Testing
+            - ✅ Compilation check passed
+            - ✅ Tests passed
+            - ✅ Clippy lints passed
+            
+            This is an automated PR created by the dependencies workflow.
+          branch: chore/update-cargo-lock
+          delete-branch: true
+
+  check-licenses:
+    name: License Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-license
+        run: cargo install cargo-license
+
+      - name: Check licenses
+        run: |
+          echo "## Main Project Licenses" > license-report.md
+          cargo license --json | jq -r '.[] | "- \(.name) (\(.version)): \(.license)"' >> license-report.md
+          
+          echo "" >> license-report.md
+          echo "## Flash Programmer Licenses" >> license-report.md
+          cd flash_programmer && cargo license --json | jq -r '.[] | "- \(.name) (\(.version)): \(.license)"' >> ../license-report.md
+          
+          echo "" >> ../license-report.md
+          echo "## Flash Test Image Licenses" >> ../license-report.md
+          cd ../flash_test_image && cargo license --json | jq -r '.[] | "- \(.name) (\(.version)): \(.license)"' >> ../license-report.md
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: license-report.md

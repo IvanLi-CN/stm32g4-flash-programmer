@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.{rs}"
+      run: cargo fmt
+      stage_fixed: true
+    clippy:
+      glob: "*.{rs}"
+      run: cargo clippy -- -D warnings
+
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx commitlint --edit {1}

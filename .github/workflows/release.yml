@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build flash_programmer release
+        run: cd flash_programmer && cargo build --release
+
+      - name: Build flash_test_image release
+        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf --release
+
+      - name: Build main project release
+        run: cargo build --release
+
+      - name: Install cargo-binutils
+        run: |
+          cargo install cargo-binutils
+          rustup component add llvm-tools-preview
+
+      - name: Generate binary artifacts
+        run: |
+          # Create artifacts directory
+          mkdir -p artifacts
+          
+          # Flash programmer (host binary)
+          cp flash_programmer/target/release/flash_programmer artifacts/flash_programmer
+          
+          # Flash test image (embedded binary)
+          cp flash_test_image/target/thumbv7em-none-eabihf/release/flash_test_image artifacts/flash_test_image.elf
+          
+          # Generate binary file for flash_test_image
+          cd flash_test_image && cargo objcopy --target thumbv7em-none-eabihf --release --bin flash_test_image -- -O binary ../artifacts/flash_test_image.bin
+          
+          # Generate hex file for flash_test_image
+          cargo objcopy --target thumbv7em-none-eabihf --release --bin flash_test_image -- -O ihex ../artifacts/flash_test_image.hex
+          
+          # Generate size report for flash_test_image
+          cargo size --target thumbv7em-none-eabihf --release --bin flash_test_image > ../artifacts/flash_test_image-size-report.txt
+          
+          # Generate memory map for flash_test_image
+          cargo nm --target thumbv7em-none-eabihf --release --bin flash_test_image | sort > ../artifacts/flash_test_image-memory-map.txt
+          
+          cd ..
+          
+          # Main project (png converter)
+          cp target/release/png_to_bitmap artifacts/png_to_bitmap
+
+      - name: Calculate checksums
+        run: |
+          cd artifacts
+          sha256sum * > checksums.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: stm32g4-flash-programmer-${{ github.ref_name || github.event.inputs.tag }}
+          path: artifacts/
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: stm32g4-flash-programmer-${{ github.ref_name || github.event.inputs.tag }}
+          path: artifacts/
+
+      - name: Generate release notes
+        run: |
+          echo "# STM32G4 Flash Programmer Release ${{ github.ref_name || github.event.inputs.tag }}" > release-notes.md
+          echo "" >> release-notes.md
+          echo "## 🚀 Features" >> release-notes.md
+          echo "- W25Q128 Flash memory programming via ST-Link" >> release-notes.md
+          echo "- STM32G431CB microcontroller support" >> release-notes.md
+          echo "- PNG to bitmap conversion tool" >> release-notes.md
+          echo "- Embassy async framework integration" >> release-notes.md
+          echo "- Test image generation for flash verification" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "## 📦 Artifacts" >> release-notes.md
+          echo "- \`flash_programmer\` - Host tool for flash programming" >> release-notes.md
+          echo "- \`flash_test_image.elf\` - ELF binary for STM32G4" >> release-notes.md
+          echo "- \`flash_test_image.bin\` - Raw binary for flashing" >> release-notes.md
+          echo "- \`flash_test_image.hex\` - Intel HEX format" >> release-notes.md
+          echo "- \`png_to_bitmap\` - PNG conversion utility" >> release-notes.md
+          echo "- \`flash_test_image-size-report.txt\` - Memory usage report" >> release-notes.md
+          echo "- \`flash_test_image-memory-map.txt\` - Symbol memory map" >> release-notes.md
+          echo "- \`checksums.sha256\` - SHA256 checksums" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "## 🔧 Flashing Instructions" >> release-notes.md
+          echo "\`\`\`bash" >> release-notes.md
+          echo "# Using probe-rs" >> release-notes.md
+          echo "probe-rs run --chip STM32G431CBUx flash_test_image.elf" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "# Or flash binary directly" >> release-notes.md
+          echo "probe-rs download --chip STM32G431CBUx --format bin flash_test_image.bin" >> release-notes.md
+          echo "\`\`\`" >> release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || github.event.inputs.tag }}
+          name: STM32G4 Flash Programmer ${{ github.ref_name || github.event.inputs.tag }}
+          body_path: release-notes.md
+          files: |
+            artifacts/*
+          draft: false
+          prerelease: ${{ contains(github.ref_name || github.event.inputs.tag, 'alpha') || contains(github.ref_name || github.event.inputs.tag, 'beta') || contains(github.ref_name || github.event.inputs.tag, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

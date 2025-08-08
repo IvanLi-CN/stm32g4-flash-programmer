@@ -17,7 +17,10 @@ use embassy_sync::mutex::Mutex;
 use static_cell::StaticCell;
 use w25::{W25, Q, Error};
 use programmer::FlashProgrammer;
+// RTT functionality removed - using defmt only
 use {defmt_rtt as _, panic_probe as _};
+
+
 
 // #[global_allocator]
 // static HEAP: Heap = Heap::empty();
@@ -47,6 +50,10 @@ fn configure_stm32() -> embassy_stm32::Config {
         config.rcc.sys = Sysclk::PLL1_R;
         config.rcc.mux.clk48sel = mux::Clk48sel::HSI48;
     }
+
+    // Enable dead battery support
+    config.enable_ucpd1_dead_battery = true;
+
     config
 }
 
@@ -59,12 +66,15 @@ async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySp
     // SPI2 pins for W25Q128 Flash
     let sck_pin = p.PB13;   // SPI2_SCK
     let mosi_pin = p.PB15;  // SPI2_MOSI
-    let miso_pin = p.PA10;  // SPI2_MISO
+    let miso_pin = p.PB14;  // SPI2_MISO (corrected from PA10)
     let cs_pin_output = Output::new(p.PB12, Level::High, Speed::VeryHigh); // SPI2_NSS
 
-    // Use dummy pins for WP and HOLD (they're not connected or not needed for basic operation)
-    let wp_pin = DummyPin;
+    // Configure WP (Write Protect) pin - CRITICAL for Flash writing!
+    let _wp_pin_output = Output::new(p.PB11, Level::High, Speed::VeryHigh); // WP must be HIGH to enable writing
+    let wp_pin = DummyPin; // Still use DummyPin for the driver, but we control WP separately
     let hold_pin = DummyPin;
+
+    info!("WP pin (PB11) configured as HIGH - Write protection DISABLED");
 
     let mut spi_config = SpiConfig::default();
     spi_config.frequency = Hertz(1_000_000); // 1MHz for Flash communication (reduced for debugging)
@@ -109,122 +119,11 @@ async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySp
     flash
 }
 
-/// Test checkerboard image data (160x40 RGB565)
-const TEST_IMAGE: &[u8] = include_bytes!("../../test_data/checkerboard_160x40.bin");
 
-/// Demonstrate Flash programming operations
-async fn demo_flash_operations<SPI>(flash: W25q32jv<SPI, DummyPin, DummyPin>) -> Result<(), Error<SPI::Error, crate::programmer::DummyError>>
-where
-    SPI: embedded_hal_async::spi::SpiDevice,
-    SPI::Error: core::fmt::Debug,
-{
-    let mut programmer = FlashProgrammer::new(flash);
 
-    // Get and display device information
-    info!("Reading device information...");
-    let device_info = programmer.get_device_info().await?;
-    device_info.print_info();
 
-    // Program test checkerboard image to entire Flash
-    info!("=== Programming Test Checkerboard Image (16MB) ===");
-    let test_image_addr = 0x000000; // Start at beginning of Flash
-    info!("Programming test image ({} bytes) to fill 16MB Flash starting at address 0x{:06X}",
-          TEST_IMAGE.len(), test_image_addr);
 
-    // First, let's try to read what's currently at address 0x000000
-    info!("Reading current data at address 0x000000...");
-    let mut read_buffer = [0u8; 32];
-    match programmer.read_data(test_image_addr, &mut read_buffer).await {
-        Ok(()) => {
-            info!("Current data at 0x000000: {:?}", &read_buffer[0..16]);
-        }
-        Err(_e) => {
-            error!("Failed to read current data");
-        }
-    }
 
-    // Erase entire chip for 16MB programming
-    info!("Erasing entire Flash chip (this may take several minutes)...");
-    match programmer.erase_chip().await {
-        Ok(()) => {
-            info!("✓ Flash chip erased successfully");
-        }
-        Err(e) => {
-            error!("✗ Failed to erase Flash chip");
-            return Err(e);
-        }
-    }
-
-    // Calculate how many times to repeat the test image to fill 16MB
-    const FLASH_SIZE: u32 = 16 * 1024 * 1024; // 16MB
-    let image_size = TEST_IMAGE.len() as u32;
-    let repeat_count = FLASH_SIZE / image_size;
-    let remaining_bytes = FLASH_SIZE % image_size;
-
-    info!("Will write {} complete images + {} remaining bytes", repeat_count, remaining_bytes);
-
-    // Program the test image repeatedly
-    let mut current_address = 0u32;
-    for i in 0..repeat_count {
-        info!("Programming image {} of {} at address 0x{:08X}", i + 1, repeat_count, current_address);
-
-        match programmer.program_data(current_address, TEST_IMAGE).await {
-            Ok(()) => {
-                current_address += image_size;
-                if (i + 1) % 100 == 0 {
-                    info!("  Progress: {}/{} images written", i + 1, repeat_count);
-                }
-            }
-            Err(e) => {
-                error!("✗ Failed to program image {} at address 0x{:08X}", i + 1, current_address);
-                return Err(e);
-            }
-        }
-    }
-
-    // Program remaining partial image if any
-    if remaining_bytes > 0 {
-        info!("Programming remaining {} bytes at address 0x{:08X}", remaining_bytes, current_address);
-        let partial_image = &TEST_IMAGE[..(remaining_bytes as usize)];
-        match programmer.program_data(current_address, partial_image).await {
-            Ok(()) => {
-                info!("✓ Remaining bytes programmed successfully");
-            }
-            Err(e) => {
-                error!("✗ Failed to program remaining bytes");
-                return Err(e);
-            }
-        }
-    }
-
-    info!("✓ Test image programmed successfully to entire 16MB Flash");
-
-    // Example 1: Program test data (commented out for debugging)
-    // let test_data = include_bytes!("../test_data.bin");
-    // let program_address = 0x100000; // Start at 1MB offset
-
-    // info!("=== Programming Test Data ===");
-    // programmer.program_and_verify(program_address, test_data).await?;
-
-    // Example 2: Read back some data and dump it (commented out for debugging)
-    // info!("=== Reading Back Data ===");
-    // programmer.dump_flash(program_address, 256).await?;
-
-    // Example 3: Program a pattern (commented out for debugging)
-    // let pattern_data: [u8; 1024] = core::array::from_fn(|i| (i % 256) as u8);
-    // let pattern_address = 0x200000; // Start at 2MB offset
-
-    // info!("=== Programming Pattern Data ===");
-    // programmer.program_and_verify(pattern_address, &pattern_data).await?;
-
-    // Example 4: Erase a specific sector (commented out for debugging)
-    // info!("=== Erasing Sector ===");
-    // let sector_to_erase = 0x300000 / w25q128::constants::SECTOR_SIZE; // Sector at 3MB
-    // programmer.erase_sector(sector_to_erase).await?;
-
-    info!("Flash programmer finished. System will halt.");
-    Ok(())
-}
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
@@ -244,20 +143,41 @@ async fn main(_spawner: Spawner) {
 
     // Initialize Flash
     let flash = initialize_flash_spi(p).await;
+    let mut programmer = FlashProgrammer::new(flash);
 
-    // Run Flash programming demonstration
-    match demo_flash_operations(flash).await {
-        Ok(_) => {
-            info!("Flash programming demonstration completed successfully!");
+    // Get device info
+    info!("Reading device information...");
+    match programmer.get_device_info().await {
+        Ok(device_info) => {
+            device_info.print_info();
         }
         Err(e) => {
-            error!("Flash programming demonstration failed: {:?}", e);
+            error!("Failed to read device info: {:?}", e);
+            return;
         }
     }
 
-    info!("Flash programmer finished. System will halt.");
-    
-    // Halt the system
+    // Do NOT automatically erase chip to protect existing data
+    info!("Flash chip ready - existing data preserved");
+
+    // Test Flash read operation only (no erase/write to avoid blocking)
+    info!("Testing Flash read operation...");
+    let mut read_buffer = [0u8; 16];
+    match programmer.read_data(0x000000, &mut read_buffer).await {
+        Ok(()) => {
+            info!("✓ Flash read test successful");
+            info!("Data at address 0x000000: {:?}", read_buffer);
+        }
+        Err(e) => {
+            error!("✗ Flash read test failed: {:?}", e);
+        }
+    }
+
+    info!("Flash programmer ready for external commands");
+
+    info!("Flash programmer finished.");
+
+    // Keep running for debugging
     loop {
         cortex_m::asm::wfi();
     }

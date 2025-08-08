@@ -1,6 +1,6 @@
-# Override the parent config to run on host instead of embedded target
+# Build configuration for STM32G431CBUx
 [build]
-# target = "thumbv7em-none-eabihf"  # Commented out to use host target
+target = "thumbv7em-none-eabihf"
 
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 runner = "probe-rs run --chip STM32G431CBUx"

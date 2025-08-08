@@ -1,5 +1,5 @@
 use defmt::*;
-use w25::{W25, Q, Error};
+use w25::{W25, Q, Error, NorSeries};
 use embedded_hal::digital::{OutputPin, PinState};
 
 /// Dummy pin implementation for HOLD and WP pins
@@ -99,9 +99,9 @@ where
         info!("Programming {} bytes to Flash at address 0x{:06X}", data.len(), address);
 
         // Calculate sectors to erase
-        let start_sector = address / w25q32jv::SECTOR_SIZE as u32;
+        let start_sector = address / w25::Q::SECTOR_SIZE;
         let end_address = address + data.len() as u32 - 1;
-        let end_sector = end_address / w25q32jv::SECTOR_SIZE as u32;
+        let end_sector = end_address / w25::Q::SECTOR_SIZE;
 
         // Erase required sectors
         for sector in start_sector..=end_sector {
@@ -159,7 +159,7 @@ where
             let expected_chunk = &expected_data[verified_bytes..verified_bytes + chunk_size];
             if read_buffer.as_slice() != expected_chunk {
                 error!("Verification failed at address 0x{:06X}", current_address);
-                return Err(Error::ReadbackFail); // Use readback fail for verification failure
+                return Err(Error::OutOfBounds); // Use out of bounds for verification failure
             }
 
             verified_bytes += chunk_size;

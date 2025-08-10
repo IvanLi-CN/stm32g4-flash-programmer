@@ -1,34 +1,34 @@
 #![no_std]
 #![no_main]
 
-mod programmer;
 mod flash_buffer;
+mod programmer;
 
 use defmt::*;
+use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice as EmbassySpiDevice;
 use embassy_executor::Spawner;
 use embassy_stm32::gpio::{Level, Output, Speed};
 use embassy_stm32::spi::{Config as SpiConfig, Spi as Stm32Spi};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::{bind_interrupts, mode};
-use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice as EmbassySpiDevice;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_time::{Duration, Timer};
-use static_cell::StaticCell;
-use w25::{W25, Q, Error};
+use flash_buffer::{BufferStatus, FlashBuffer};
 use programmer::FlashProgrammer;
-use flash_buffer::{FlashBuffer, BufferStatus};
+use static_cell::StaticCell;
+use w25::{Q, W25};
 // RTT functionality removed - using defmt only
 use {defmt_rtt as _, panic_probe as _};
-
-
 
 // #[global_allocator]
 // static HEAP: Heap = Heap::empty();
 
-bind_interrupts!(struct Irqs {
-    // SPI2 => embassy_stm32::spi::InterruptHandler<peripherals::SPI2>;
-});
+bind_interrupts!(
+    struct Irqs {
+        // SPI2 => embassy_stm32::spi::InterruptHandler<peripherals::SPI2>;
+    }
+);
 
 /// Configure STM32 system
 fn configure_stm32() -> embassy_stm32::Config {
@@ -61,13 +61,25 @@ fn configure_stm32() -> embassy_stm32::Config {
 use crate::programmer::DummyPin;
 
 /// Initialize SPI2 for W25Q128 Flash communication
-async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySpiDevice<'static, CriticalSectionRawMutex, Stm32Spi<'static, mode::Async>, Output<'static>>, DummyPin, DummyPin> {
+async fn initialize_flash_spi(
+    p: embassy_stm32::Peripherals,
+) -> W25<
+    Q,
+    EmbassySpiDevice<
+        'static,
+        CriticalSectionRawMutex,
+        Stm32Spi<'static, mode::Async>,
+        Output<'static>,
+    >,
+    DummyPin,
+    DummyPin,
+> {
     info!("Initializing SPI2 for W25Q128 Flash...");
 
     // SPI2 pins for W25Q128 Flash
-    let sck_pin = p.PB13;   // SPI2_SCK
-    let mosi_pin = p.PB15;  // SPI2_MOSI
-    let miso_pin = p.PB14;  // SPI2_MISO (corrected from PA10)
+    let sck_pin = p.PB13; // SPI2_SCK
+    let mosi_pin = p.PB15; // SPI2_MOSI
+    let miso_pin = p.PB14; // SPI2_MISO (corrected from PA10)
     let cs_pin_output = Output::new(p.PB12, Level::High, Speed::VeryHigh); // SPI2_NSS
 
     // Configure WP (Write Protect) pin - CRITICAL for Flash writing!
@@ -85,11 +97,7 @@ async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySp
     info!("SPI Config - Frequency: {} Hz", spi_config.frequency.0);
 
     let spi_bus = Stm32Spi::new(
-        p.SPI2,
-        sck_pin,
-        mosi_pin,
-        miso_pin,
-        p.DMA1_CH4, // TX DMA
+        p.SPI2, sck_pin, mosi_pin, miso_pin, p.DMA1_CH4, // TX DMA
         p.DMA1_CH5, // RX DMA
         spi_config,
     );
@@ -106,7 +114,8 @@ async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySp
         Output<'static>,
     >::new(spi_bus_mutex_ref, cs_pin_output);
 
-    let flash = match W25::new(spi_device, hold_pin, wp_pin, 16 * 1024 * 1024) { // 128Mbit = 16MB
+    match W25::new(spi_device, hold_pin, wp_pin, 16 * 1024 * 1024) {
+        // 128Mbit = 16MB
         Ok(flash) => {
             info!("W25Q128 Flash initialized successfully!");
             flash
@@ -115,16 +124,8 @@ async fn initialize_flash_spi(p: embassy_stm32::Peripherals) -> W25<Q, EmbassySp
             error!("Failed to initialize W25Q128 Flash: {:?}", e);
             core::panic!("Flash initialization failed");
         }
-    };
-
-    flash
+    }
 }
-
-
-
-
-
-
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
@@ -187,16 +188,25 @@ async fn main(_spawner: Spawner) {
             let start_address = flash_buffer.read_address();
             let verify_length = flash_buffer.read_length();
 
-            info!("Verifying {} bytes from address 0x{:08X}", verify_length, start_address);
+            info!(
+                "Verifying {} bytes from address 0x{:08X}",
+                verify_length, start_address
+            );
             flash_buffer.write_status(BufferStatus::Programming);
 
             // 简化验证：只检查前1KB数据
             let verify_size = verify_length.min(1024) as usize;
             let mut verify_buffer = [0u8; 1024];
 
-            match programmer.read_data(start_address, &mut verify_buffer[..verify_size]).await {
+            match programmer
+                .read_data(start_address, &mut verify_buffer[..verify_size])
+                .await
+            {
                 Ok(()) => {
-                    info!("✓ Verification successful - first {} bytes read OK", verify_size);
+                    info!(
+                        "✓ Verification successful - first {} bytes read OK",
+                        verify_size
+                    );
                     info!("Sample data: {:?}", &verify_buffer[..16.min(verify_size)]);
                     flash_buffer.write_status(BufferStatus::VerifyComplete);
                 }
@@ -228,10 +238,16 @@ async fn main(_spawner: Spawner) {
                             info!("First 16 bytes: {:?}", &data_buffer[..bytes_read.min(16)]);
 
                             // Program data to flash
-                            match programmer.program_data(request.address, &data_buffer[..bytes_read]).await {
+                            match programmer
+                                .program_data(request.address, &data_buffer[..bytes_read])
+                                .await
+                            {
                                 Ok(()) => {
                                     total_programmed += bytes_read as u32;
-                                    info!("✓ Programming successful. Total: {} bytes", total_programmed);
+                                    info!(
+                                        "✓ Programming successful. Total: {} bytes",
+                                        total_programmed
+                                    );
                                     flash_buffer.write_status(BufferStatus::Complete);
                                 }
                                 Err(e) => {
@@ -266,16 +282,25 @@ async fn main(_spawner: Spawner) {
                 let start_address = flash_buffer.read_address();
                 let verify_length = flash_buffer.read_length();
 
-                info!("Verifying {} bytes from address 0x{:08X}", verify_length, start_address);
+                info!(
+                    "Verifying {} bytes from address 0x{:08X}",
+                    verify_length, start_address
+                );
                 flash_buffer.write_status(BufferStatus::Programming);
 
                 // 简化验证：只检查前1KB数据
                 let verify_size = verify_length.min(1024) as usize;
                 let mut verify_buffer = [0u8; 1024];
 
-                match programmer.read_data(start_address, &mut verify_buffer[..verify_size]).await {
+                match programmer
+                    .read_data(start_address, &mut verify_buffer[..verify_size])
+                    .await
+                {
                     Ok(()) => {
-                        info!("✓ Verification successful - first {} bytes read OK", verify_size);
+                        info!(
+                            "✓ Verification successful - first {} bytes read OK",
+                            verify_size
+                        );
                         info!("Sample data: {:?}", &verify_buffer[..16.min(verify_size)]);
                         flash_buffer.write_status(BufferStatus::VerifyComplete);
                     }

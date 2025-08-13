@@ -1,5 +1,12 @@
+[workspace]
+members = [
+    "firmware",
+    "host-tool",
+    "protocol"
+]
+
 [package]
-name = "png_converter"
+name = "stm32g4-flash-programmer-workspace"
 version = "0.1.0"
 edition = "2021"
 

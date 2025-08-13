@@ -1,0 +1,11 @@
+[package]
+name = "flash-protocol"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crc = { version = "3.0", default-features = false }
+
+[features]
+default = ["std"]
+std = []

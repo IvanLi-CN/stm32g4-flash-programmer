@@ -1,0 +1,36 @@
+[package]
+name = "flash-programmer-tool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Serial communication
+tokio-serial = "5.4"
+
+# Command line interface
+clap = { version = "4.0", features = ["derive"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Progress indication
+indicatif = "0.17"
+
+# File I/O
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1.0"
+
+# Protocol
+flash-protocol = { path = "../protocol" }
+
+# Utilities
+hex = "0.4"
+humantime = "2.1"
+
+[profile.release]
+lto = true
+opt-level = 3

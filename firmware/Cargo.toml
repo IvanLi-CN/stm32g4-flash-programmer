@@ -1,0 +1,49 @@
+[package]
+name = "stm32g4-flash-programmer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Embassy framework (git latest versions)
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", features = ["arch-cortex-m", "executor-thread"] }
+embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", features = ["stm32g431cb", "time-driver-any", "exti"] }
+embassy-usb = { git = "https://github.com/embassy-rs/embassy" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy" }
+embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy" }
+
+# Hardware abstraction
+embedded-hal = "1.0.0-alpha.8"
+embedded-hal-async = "1.0.0-alpha.8"
+embedded-storage = "0.3"
+embedded-storage-async = "0.4"
+
+# Utilities
+heapless = "0.8"
+nb = "1.0"
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+panic-halt = "0.2"
+linked_list_allocator = "0.10"
+
+# Protocol
+flash-protocol = { path = "../protocol", default-features = false }
+
+# W25 Flash driver
+w25 = "0.6"
+static_cell = "2.0"
+
+# Logging (optional, for debugging)
+# defmt = "0.3"
+# defmt-rtt = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+[profile.release]
+debug = 2
+lto = true
+opt-level = "s"
+
+[profile.dev]
+debug = 2
+opt-level = 1

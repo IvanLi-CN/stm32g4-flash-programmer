@@ -3,6 +3,7 @@ runner = "probe-rs run --chip STM32G431CBUx"
 rustflags = [
   "-C", "linker=flip-link",
   "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tdefmt.x",
 ]
 
 [build]

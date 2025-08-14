@@ -1,3 +1,4 @@
+// defmt support for error types
 use embassy_stm32::spi::Spi;
 use embassy_stm32::gpio::Output;
 use embassy_stm32::mode::Async;
@@ -11,7 +12,7 @@ use alloc::vec::Vec;
 // W25Q128 Commands
 const CMD_READ_JEDEC_ID: u8 = 0x9F;
 
-#[derive(Debug)]
+#[derive(Debug, defmt::Format)]
 pub enum SafeFlashError {
     NotInitialized,
     InitializationFailed,
@@ -58,7 +59,7 @@ impl SafeFlashManager {
         }
         
         let spi_bus = self.spi_bus.ok_or(SafeFlashError::NotInitialized)?;
-        let mut cs_pin = self.cs_pin.take().ok_or(SafeFlashError::NotInitialized)?;
+        let cs_pin = self.cs_pin.take().ok_or(SafeFlashError::NotInitialized)?;
         
         // Try to read JEDEC ID with timeout
         let result = with_timeout(Duration::from_millis(100), async {

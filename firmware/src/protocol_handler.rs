@@ -34,10 +34,13 @@ impl ProtocolHandler {
         SPI: SpiDevice,
         SPI::Error: defmt::Format,
     {
+        debug!("Processing packet: {} bytes received", data.len());
+
         // Add received data to buffer
         for &byte in data {
             if self.buffer.push(byte).is_err() {
                 // Buffer overflow, reset and return error
+                error!("Buffer overflow! Clearing buffer and returning error");
                 self.buffer.clear();
                 let response = Response::new(Status::BufferOverflow, Vec::new());
                 return Ok(response.to_bytes());
@@ -144,13 +147,16 @@ impl ProtocolHandler {
         SPI: SpiDevice,
         SPI::Error: defmt::Format,
     {
-        match packet.command {
+        info!("Processing command: {:?}", packet.command);
+        let result = match packet.command {
             Command::Info => self.handle_info_command(flash_driver).await,
             Command::Erase => self.handle_erase_command(packet, flash_driver).await,
             Command::Write => self.handle_write_command(packet, flash_driver).await,
             Command::Read => self.handle_read_command(packet, flash_driver).await,
             Command::Verify => self.handle_verify_command(packet, flash_driver).await,
-        }
+        };
+        debug!("Command processing completed with status: {:?}", result.status);
+        result
     }
 
     async fn handle_info_command<SPI>(&mut self, flash_driver: &mut FlashDriver<SPI>) -> Response

@@ -8,14 +8,15 @@ use linked_list_allocator::LockedHeap;
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 use embassy_executor::Spawner;
-use embassy_stm32::gpio::{Level, Output, Speed};
+
 use embassy_stm32::usb::Driver;
-use embassy_stm32::{bind_interrupts, peripherals, usb, Config};
+use embassy_stm32::{bind_interrupts, peripherals, usb};
 use embassy_time::{Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
 use flash_protocol::*;
-use panic_halt as _;
+use panic_probe as _;
+use defmt_rtt as _;
 use alloc::vec::Vec;
 use alloc::vec;
 
@@ -45,16 +46,39 @@ async fn main(spawner: Spawner) {
     // Initialize heap
     unsafe {
         ALLOCATOR.lock().init(HEAP.as_mut_ptr(), HEAP.len());
+        defmt::info!("Heap initialized: {} bytes", HEAP.len());
     }
 
-    // Initialize hardware with default config
-    let p = embassy_stm32::init(Config::default());
+    let mut config = embassy_stm32::Config::default();
+    {
+        use embassy_stm32::rcc::*;
+        config.rcc.hsi48 = Some(Hsi48Config {
+            sync_from_usb: true,
+        });
+        config.rcc.pll = Some(Pll {
+            source: PllSource::HSI,
+            prediv: PllPreDiv::DIV4,
+            mul: PllMul::MUL85,
+            divp: None,
+            divq: None,
+            // Main system clock at 170 MHz
+            divr: Some(PllRDiv::DIV2),
+        });
+        config.rcc.mux.adc12sel = mux::Adcsel::SYS;
+        config.rcc.sys = Sysclk::PLL1_R;
+        config.rcc.mux.clk48sel = mux::Clk48sel::HSI48;
+        config.enable_ucpd1_dead_battery = true;
+    }
+    let p = embassy_stm32::init(config);
+    defmt::info!("STM32 initialized successfully");
 
     // Create SafeFlashManager (no SPI initialization yet)
-    let mut flash_manager = SafeFlashManager::new();
+    let flash_manager = SafeFlashManager::new();
+    defmt::info!("SafeFlashManager created");
 
     // Initialize USB
     let driver = Driver::new(p.USB, Irqs, p.PA12, p.PA11);
+    defmt::info!("USB driver initialized");
     
     // Create embassy-usb Config
     let mut usb_config = embassy_usb::Config::new(0xc0de, 0xcafe);
@@ -80,23 +104,22 @@ async fn main(spawner: Spawner) {
         unsafe { &mut CONTROL_BUF },
     );
 
-    // Create CDC-ACM class with larger buffer for high-speed transfers
-    let cdc_class = CdcAcmClass::new(&mut builder, unsafe { &mut USB_STATE }, 1024);
+    // Create CDC-ACM class with minimal buffer size
+    let cdc_class = CdcAcmClass::new(&mut builder, unsafe { &mut USB_STATE }, 64);
     let usb_device = builder.build();
 
     // Spawn USB task
     spawner.spawn(usb_task(usb_device)).unwrap();
+    defmt::info!("USB task spawned");
 
     // Spawn protocol handler task with Flash manager
     spawner.spawn(protocol_task(cdc_class, flash_manager)).unwrap();
+    defmt::info!("Protocol handler task spawned");
 
-    // Main loop - just blink LED to show we're alive
-    let mut led = Output::new(p.PC13, Level::Low, Speed::Low);
+    // Main loop - keep the main task alive
+    defmt::info!("Entering main loop - system ready");
     loop {
-        led.set_high();
-        Timer::after(Duration::from_millis(500)).await;
-        led.set_low();
-        Timer::after(Duration::from_millis(500)).await;
+        Timer::after(Duration::from_millis(1000)).await;
     }
 }
 

@@ -1,3 +1,4 @@
+use defmt::*;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::spi::SpiDevice;
 use flash_protocol::*;
@@ -16,7 +17,7 @@ const CMD_CHIP_ERASE: u8 = 0xC7;
 const STATUS_BUSY: u8 = 0x01;
 const STATUS_WEL: u8 = 0x02;
 
-#[derive(Debug)]
+#[derive(Debug, defmt::Format)]
 pub enum FlashDriverError {
     SpiError,
     InvalidAddress,
@@ -118,11 +119,14 @@ where
     }
 
     pub async fn get_info(&mut self) -> Result<FlashInfo, FlashDriverError> {
+        debug!("Getting flash info");
         if !self.initialized {
+            error!("Flash driver not initialized");
             return Err(FlashDriverError::NotInitialized);
         }
 
         let jedec_id = self.read_jedec_id().await?;
+        info!("Flash JEDEC ID: 0x{:06X}", jedec_id);
 
         Ok(FlashInfo {
             jedec_id,

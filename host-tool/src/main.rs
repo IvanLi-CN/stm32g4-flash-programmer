@@ -162,22 +162,17 @@ async fn main() -> Result<()> {
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap());
 
-            flash_commands.write_with_progress(address, &data, &pb).await?;
-            
-            pb.finish_with_message("Write completed!");
-            println!("Data written successfully!");
-
             if verify {
-                println!("Verifying...");
-                let pb = ProgressBar::new(data.len() as u64);
-                pb.set_style(ProgressStyle::default_bar()
-                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.yellow/blue}] {bytes}/{total_bytes} ({eta})")
-                    .unwrap());
-
-                flash_commands.verify_with_progress(address, &data, &pb).await?;
-                
-                pb.finish_with_message("Verification completed!");
-                println!("Verification successful!");
+                // Use write with automatic verification for maximum data integrity
+                flash_commands.write_and_verify_with_progress(address, &data, &pb).await?;
+                pb.finish_with_message("Write and verification completed!");
+                println!("✅ Data written and verified successfully!");
+            } else {
+                // Use high-speed write only
+                flash_commands.write_with_progress(address, &data, &pb).await?;
+                pb.finish_with_message("Write completed!");
+                println!("✅ Data written successfully!");
+                println!("⚠️  Warning: Data was not verified. Use --verify flag to ensure data integrity.");
             }
         }
 

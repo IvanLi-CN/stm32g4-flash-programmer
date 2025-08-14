@@ -32,8 +32,8 @@ static mut BOS_DESCRIPTOR: [u8; 256] = [0; 256];
 static mut CONTROL_BUF: [u8; 64] = [0; 64];
 static mut USB_STATE: State = State::new();
 
-// Double buffering for high-speed USB transfers
-static mut USB_RX_BUFFER_1: [u8; 4096] = [0; 4096];
+// Optimized dual-buffer system for high-speed USB transfers (memory-efficient)
+static mut USB_RX_BUFFER_1: [u8; 4096] = [0; 4096];  // 4KB buffers for balance of speed and memory
 static mut USB_RX_BUFFER_2: [u8; 4096] = [0; 4096];
 static mut CURRENT_BUFFER: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
@@ -112,16 +112,52 @@ async fn protocol_task(
 ) {
     // USB ready check removed for speed
     
-    // Use larger buffer for better performance
-    let mut buffer = [0u8; 2048];  // Increased from 1024 to 2048
+    // High-performance dual buffering system (memory-efficient)
     let mut packet_buffer = Vec::new();
+    let mut _burst_mode = false;
+    let mut burst_packet_count = 0;
+
+    // Get current buffer for dual buffering
+    let get_current_buffer = || -> &'static mut [u8; 4096] {
+        unsafe {
+            if CURRENT_BUFFER.load(core::sync::atomic::Ordering::Relaxed) {
+                &mut USB_RX_BUFFER_2
+            } else {
+                &mut USB_RX_BUFFER_1
+            }
+        }
+    };
+
+    // Switch to next buffer
+    let switch_buffer = || {
+        unsafe {
+            CURRENT_BUFFER.fetch_xor(true, core::sync::atomic::Ordering::Relaxed);
+        }
+    };
     
     loop {
-        // Try to read data using larger buffer
-        match cdc_class.read_packet(&mut buffer).await {
+        // Get current buffer for high-speed reading
+        let current_buffer = get_current_buffer();
+
+        // Try to read data using triple buffering
+        match cdc_class.read_packet(current_buffer).await {
             Ok(n) if n > 0 => {
+                // Switch to next buffer immediately for next read
+                switch_buffer();
+
                 // Add to packet buffer
-                packet_buffer.extend_from_slice(&buffer[..n]);
+                packet_buffer.extend_from_slice(&current_buffer[..n]);
+
+                // Detect burst mode for high-speed transfers
+                if n >= 1024 {
+                    _burst_mode = true;
+                    burst_packet_count += 1;
+                } else if burst_packet_count > 0 {
+                    burst_packet_count -= 1;
+                    if burst_packet_count == 0 {
+                        _burst_mode = false;
+                    }
+                }
                 
                 // Try to parse a complete packet
                 while let Some(packet) = try_parse_packet(&mut packet_buffer) {

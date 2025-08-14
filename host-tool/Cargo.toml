@@ -31,6 +31,10 @@ flash-protocol = { path = "../protocol" }
 hex = "0.4"
 humantime = "2.1"
 
+# Cryptographic hashing for data integrity
+sha2 = "0.10"
+crc32fast = "1.3"
+
 [profile.release]
 lto = true
 opt-level = 3

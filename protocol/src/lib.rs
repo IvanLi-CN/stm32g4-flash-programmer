@@ -53,6 +53,8 @@ pub enum Command {
     BatchAck = 0x07,
     /// Stream write - no ACK at all, maximum speed
     StreamWrite = 0x08,
+    /// Verify data integrity using CRC32
+    VerifyCRC = 0x09,
 }
 
 /// Status codes for responses
@@ -73,6 +75,8 @@ pub enum Status {
     BufferOverflow = 0x05,
     /// Operation timeout
     Timeout = 0x06,
+    /// Data verification failed
+    VerificationFailed = 0x07,
     /// Unknown error
     Unknown = 0xFF,
 }

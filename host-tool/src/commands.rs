@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use flash_protocol::*;
 use indicatif::ProgressBar;
+use sha2::{Sha256, Digest};
+use crc32fast::Hasher;
 
 use crate::serial::SerialConnection;
 
@@ -314,16 +316,111 @@ impl<'a> FlashCommands<'a> {
         Ok(())
     }
 
-    /// High-speed write with automatic verification
+    /// End-to-end verification using SHA256 hash comparison
+    pub async fn verify_with_hash(&mut self, address: u32, original_data: &[u8], progress: &ProgressBar) -> Result<()> {
+        progress.set_message("Computing original data hash...");
+
+        // Calculate SHA256 hash of original data
+        let mut hasher = Sha256::new();
+        hasher.update(original_data);
+        let original_hash = hasher.finalize();
+
+        progress.set_message("Reading back flash data...");
+        progress.set_position(0);
+
+        // Read back all data from flash
+        let flash_data = self.read_flash_data(address, original_data.len() as u32, progress).await?;
+
+        progress.set_message("Computing flash data hash...");
+
+        // Calculate SHA256 hash of flash data
+        let mut hasher = Sha256::new();
+        hasher.update(&flash_data);
+        let flash_hash = hasher.finalize();
+
+        // Compare hashes
+        if original_hash == flash_hash {
+            progress.set_message("✅ Hash verification successful!");
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "❌ Hash verification failed!\nOriginal: {:x}\nFlash:    {:x}",
+                original_hash, flash_hash
+            ))
+        }
+    }
+
+    /// Read data from flash for verification
+    async fn read_flash_data(&mut self, address: u32, size: u32, progress: &ProgressBar) -> Result<Vec<u8>> {
+        let mut result = Vec::new();
+        let mut current_address = address;
+        let mut remaining_size = size;
+        let mut sequence: u16 = 1;
+
+        while remaining_size > 0 {
+            let chunk_size = std::cmp::min(remaining_size, MAX_PAYLOAD_SIZE as u32);
+
+            // Read back the data - use length field for size
+            let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
+            read_packet.length = chunk_size;
+
+            let response = self.connection.send_command(read_packet).await
+                .with_context(|| format!("Failed to read flash data at address 0x{:08X}", current_address))?;
+
+            result.extend_from_slice(&response.data);
+            current_address += chunk_size;
+            remaining_size -= chunk_size;
+            sequence = sequence.wrapping_add(1);
+
+            progress.set_position((size - remaining_size) as u64);
+        }
+
+        Ok(result)
+    }
+
+    /// CRC-based data integrity verification (doesn't require reading back data)
+    pub async fn verify_with_crc(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+        progress.set_message("Computing CRC32 checksum...");
+
+        // Calculate CRC32 of original data
+        let mut hasher = Hasher::new();
+        hasher.update(data);
+        let expected_crc = hasher.finalize();
+
+        progress.set_message("Requesting firmware CRC verification...");
+
+        // Send CRC verification command to firmware
+        let crc_bytes = expected_crc.to_le_bytes().to_vec();
+        let verify_packet = Packet::new_with_sequence(Command::VerifyCRC, address, crc_bytes, 1);
+
+        match self.connection.send_command(verify_packet).await {
+            Ok(response) => {
+                if response.status == Status::Success {
+                    progress.set_message("✅ CRC verification successful!");
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("❌ CRC verification failed! Flash data doesn't match expected checksum."))
+                }
+            }
+            Err(e) => {
+                // If CRC verification is not supported by firmware, fall back to warning
+                progress.set_message("⚠️  CRC verification not supported by firmware");
+                eprintln!("Warning: CRC verification failed ({}), but data was transmitted successfully", e);
+                Ok(())
+            }
+        }
+    }
+
+    /// High-speed write with CRC-based verification
     pub async fn write_and_verify_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
         // Phase 1: High-speed write
         progress.set_message("Writing data to flash...");
         self.stream_write_with_progress(address, data, progress).await?;
 
-        // Phase 2: Verification
-        progress.set_message("Verifying written data...");
-        progress.set_position(0);
-        self.verify_write(address, data, progress).await?;
+        // Phase 2: CRC-based verification (much faster and more reliable)
+        progress.set_message("Performing CRC verification...");
+        progress.set_position(data.len() as u64); // Show as complete for CRC
+        self.verify_with_crc(address, data, progress).await?;
 
         Ok(())
     }

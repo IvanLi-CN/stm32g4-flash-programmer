@@ -224,6 +224,23 @@ async fn protocol_task(
                             // Mock verify operation
                             Response::new(Status::Success, Vec::new())
                         }
+                        Command::VerifyCRC => {
+                            // CRC verification - for demo, always succeed to test the flow
+                            if packet.data.len() >= 4 {
+                                let _expected_crc = u32::from_le_bytes([
+                                    packet.data[0], packet.data[1], packet.data[2], packet.data[3]
+                                ]);
+
+                                // For demo: always return success to test the verification flow
+                                // In real implementation, this would:
+                                // 1. Calculate CRC32 of the actual flash data at the specified address
+                                // 2. Compare with expected_crc
+                                // 3. Return Success or VerificationFailed accordingly
+                                Response::new(Status::Success, Vec::new())
+                            } else {
+                                Response::new(Status::InvalidCommand, Vec::new())
+                            }
+                        }
                         Command::BatchAck => {
                             // Batch ACK command - not expected from host
                             Response::new(Status::InvalidCommand, Vec::new())

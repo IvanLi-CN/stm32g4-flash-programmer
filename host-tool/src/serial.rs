@@ -82,6 +82,7 @@ impl SerialConnection {
             Status::CrcError => Err(anyhow::anyhow!("CRC error")),
             Status::BufferOverflow => Err(anyhow::anyhow!("Buffer overflow")),
             Status::Timeout => Err(anyhow::anyhow!("Operation timeout")),
+            Status::VerificationFailed => Err(anyhow::anyhow!("Data verification failed")),
             Status::Unknown => Err(anyhow::anyhow!("Unknown error")),
         }
     }

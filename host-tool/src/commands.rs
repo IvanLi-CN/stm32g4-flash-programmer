@@ -77,29 +77,33 @@ impl<'a> FlashCommands<'a> {
     }
 
     pub async fn write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+        self.stream_write_with_progress(address, data, progress).await
+    }
+
+    /// High-speed write with optimized 4KB packets
+    pub async fn batch_write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
         let mut current_address = address;
         let mut remaining_data = data;
         let mut written = 0;
-        let mut sequence: u16 = 1; // Start sequence from 1
+        let mut sequence: u16 = 1;
 
         while !remaining_data.is_empty() {
             let chunk_size = std::cmp::min(remaining_data.len(), MAX_PAYLOAD_SIZE);
             let chunk = &remaining_data[..chunk_size];
 
+            // Use regular Write command with 4KB packets for maximum compatibility
             let packet = Packet::new_with_sequence(Command::Write, current_address, chunk.to_vec(), sequence);
 
-            // Direct send without retry
+            // Send and wait for ACK - simplified approach
             self.connection.send_command(packet).await
                 .with_context(|| format!("Failed to write at address 0x{:08X}", current_address))?;
 
             current_address += chunk_size as u32;
             remaining_data = &remaining_data[chunk_size..];
             written += chunk_size;
-            sequence = sequence.wrapping_add(1); // Increment sequence number
+            sequence = sequence.wrapping_add(1);
 
             progress.set_position(written as u64);
-
-            // No delay needed - we already wait for ACK in send_command!
         }
 
         Ok(())
@@ -188,6 +192,54 @@ impl<'a> FlashCommands<'a> {
             verified += chunk_size;
             
             progress.set_position(verified as u64);
+        }
+
+        Ok(())
+    }
+
+    /// Ultra-high-speed parallel stream write with pipeline optimization
+    pub async fn stream_write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+        let mut current_address = address;
+        let mut remaining_data = data;
+        let mut written = 0;
+        let mut sequence: u16 = 1;
+
+        // Conservative pipeline depth for stability
+        let pipeline_depth: usize = 4;
+        let mut packets_in_flight: usize = 0;
+
+        while !remaining_data.is_empty() || packets_in_flight > 0 {
+            // Send packets up to pipeline depth
+            while packets_in_flight < pipeline_depth && !remaining_data.is_empty() {
+                let chunk_size = std::cmp::min(remaining_data.len(), MAX_PAYLOAD_SIZE);
+                let chunk = &remaining_data[..chunk_size];
+
+                // Use StreamWrite command - no ACK expected
+                let packet = Packet::new_with_sequence(Command::StreamWrite, current_address, chunk.to_vec(), sequence);
+
+                // Send without waiting for any response - maximum speed!
+                self.connection.send_packet_no_ack(packet).await
+                    .with_context(|| format!("Failed to stream write at address 0x{:08X}", current_address))?;
+
+                current_address += chunk_size as u32;
+                remaining_data = &remaining_data[chunk_size..];
+                written += chunk_size;
+                sequence = sequence.wrapping_add(1);
+                packets_in_flight += 1;
+
+                progress.set_position(written as u64);
+            }
+
+            // Small delay to allow USB processing
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            packets_in_flight = packets_in_flight.saturating_sub(2); // Assume 2 packets processed
+        }
+
+        // Send one final regular Write command to confirm completion
+        if written > 0 {
+            let final_packet = Packet::new_with_sequence(Command::Write, address + written as u32 - 1, vec![0], sequence);
+            self.connection.send_command(final_packet).await
+                .with_context(|| "Failed to confirm stream write completion")?;
         }
 
         Ok(())

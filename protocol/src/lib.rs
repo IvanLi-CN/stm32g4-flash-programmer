@@ -21,8 +21,8 @@ pub const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_IBM_SDLC);
 pub const PACKET_MAGIC: u16 = 0xABCD;
 pub const RESPONSE_MAGIC: u16 = 0xDCBA;
 
-/// Maximum data payload size per packet (optimized 64-byte packets)
-pub const MAX_PAYLOAD_SIZE: usize = 64;
+/// Maximum data payload size per packet (optimized for speed and stability - 1KB packets)
+pub const MAX_PAYLOAD_SIZE: usize = 1024;
 
 /// Flash page size for W25Q128 (256 bytes)
 pub const FLASH_PAGE_SIZE: usize = 256;
@@ -47,6 +47,12 @@ pub enum Command {
     Read = 0x04,
     /// Verify data integrity
     Verify = 0x05,
+    /// Batch write mode - no immediate ACK required
+    BatchWrite = 0x06,
+    /// Batch ACK - acknowledge multiple packets
+    BatchAck = 0x07,
+    /// Stream write - no ACK at all, maximum speed
+    StreamWrite = 0x08,
 }
 
 /// Status codes for responses
@@ -173,6 +179,9 @@ impl Packet {
             0x03 => Command::Write,
             0x04 => Command::Read,
             0x05 => Command::Verify,
+            0x06 => Command::BatchWrite,
+            0x07 => Command::BatchAck,
+            0x08 => Command::StreamWrite,
             _ => return Err("Invalid command"),
         };
 

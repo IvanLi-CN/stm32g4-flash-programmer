@@ -61,13 +61,18 @@ impl SerialConnection {
         }
     }
 
+    pub async fn send_packet_no_ack(&mut self, packet: Packet) -> Result<()> {
+        // Send packet without waiting for ACK (for batch operations)
+        self.send_packet(&packet).await
+    }
+
     pub async fn send_command(&mut self, packet: Packet) -> Result<Response> {
         // Send packet
         self.send_packet(&packet).await?;
-        
+
         // Receive response
         let response = self.receive_response().await?;
-        
+
         // Check response status
         match response.status {
             Status::Success => Ok(response),

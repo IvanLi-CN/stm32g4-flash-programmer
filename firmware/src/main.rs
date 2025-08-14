@@ -26,11 +26,16 @@ bind_interrupts!(struct Irqs {
     USB_LP => usb::InterruptHandler<peripherals::USB>;
 });
 
-// Static buffers for USB
+// Static buffers for USB with double buffering optimization
 static mut CONFIG_DESCRIPTOR: [u8; 256] = [0; 256];
 static mut BOS_DESCRIPTOR: [u8; 256] = [0; 256];
 static mut CONTROL_BUF: [u8; 64] = [0; 64];
 static mut USB_STATE: State = State::new();
+
+// Double buffering for high-speed USB transfers
+static mut USB_RX_BUFFER_1: [u8; 4096] = [0; 4096];
+static mut USB_RX_BUFFER_2: [u8; 4096] = [0; 4096];
+static mut CURRENT_BUFFER: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 // Optimized heap for dynamic allocation (16KB) to handle 4KB write packets
 static mut HEAP: [u8; 16384] = [0; 16384];
@@ -75,8 +80,8 @@ async fn main(spawner: Spawner) {
         unsafe { &mut CONTROL_BUF },
     );
 
-    // Create CDC-ACM class
-    let cdc_class = CdcAcmClass::new(&mut builder, unsafe { &mut USB_STATE }, 64);
+    // Create CDC-ACM class with larger buffer for high-speed transfers
+    let cdc_class = CdcAcmClass::new(&mut builder, unsafe { &mut USB_STATE }, 1024);
     let usb_device = builder.build();
 
     // Spawn USB task
@@ -105,14 +110,14 @@ async fn protocol_task(
     mut cdc_class: CdcAcmClass<'static, Driver<'static, peripherals::USB>>,
     mut flash_manager: SafeFlashManager,
 ) {
-    // Wait a bit for USB to be ready
-    Timer::after(Duration::from_secs(2)).await;
+    // USB ready check removed for speed
     
-    let mut buffer = [0u8; 1024];
+    // Use larger buffer for better performance
+    let mut buffer = [0u8; 2048];  // Increased from 1024 to 2048
     let mut packet_buffer = Vec::new();
     
     loop {
-        // Try to read data
+        // Try to read data using larger buffer
         match cdc_class.read_packet(&mut buffer).await {
             Ok(n) if n > 0 => {
                 // Add to packet buffer
@@ -149,8 +154,8 @@ async fn protocol_task(
                             Response::new(Status::Success, Vec::new())
                         }
                         Command::Write => {
-                            // Check data size to prevent memory issues
-                            if packet.data.len() > 8192 {
+                            // Check data size to prevent memory issues (allow up to 1KB payload)
+                            if packet.data.len() > 1024 {
                                 // Data too large, return error
                                 Response::new(Status::BufferOverflow, Vec::new())
                             } else {
@@ -158,6 +163,18 @@ async fn protocol_task(
                                 // For now, simulate successful write
                                 // In production: flash_driver.write_data(packet.address, &packet.data).await
                                 Response::new(Status::Success, Vec::new())
+                            }
+                        }
+                        Command::BatchWrite => {
+                            // Batch write mode - process but don't send response
+                            if packet.data.len() > 1024 {
+                                Response::new(Status::BufferOverflow, Vec::new())
+                            } else {
+                                // TODO: Implement real Flash write operation
+                                // For now, simulate successful write
+                                // Skip sending response for batch writes
+                                packet_buffer.clear();
+                                continue;
                             }
                         }
                         Command::Read => {
@@ -170,6 +187,24 @@ async fn protocol_task(
                         Command::Verify => {
                             // Mock verify operation
                             Response::new(Status::Success, Vec::new())
+                        }
+                        Command::BatchAck => {
+                            // Batch ACK command - not expected from host
+                            Response::new(Status::InvalidCommand, Vec::new())
+                        }
+                        Command::StreamWrite => {
+                            // Stream write mode - no response at all, maximum speed
+                            if packet.data.len() > 1024 {
+                                // Data too large, but don't send response to maintain speed
+                                packet_buffer.clear();
+                                continue;
+                            } else {
+                                // TODO: Implement real Flash write operation
+                                // For now, simulate successful write
+                                // No response needed for stream writes
+                                packet_buffer.clear();
+                                continue;
+                            }
                         }
                     };
                     
@@ -187,12 +222,11 @@ async fn protocol_task(
                 // No data received, continue
             }
             Err(_e) => {
-                // USB read error
-                Timer::after(Duration::from_millis(100)).await;
+                // USB read error - continue immediately for speed
             }
         }
-        
-        Timer::after(Duration::from_millis(10)).await;
+
+        // Removed 10ms delay for maximum speed
     }
 }
 

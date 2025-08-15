@@ -18,6 +18,7 @@ pub struct FlashInfo {
     pub sector_size: u32,
 }
 
+#[allow(dead_code)]
 impl<'a> FlashCommands<'a> {
     pub fn new(connection: &'a mut SerialConnection) -> Self {
         Self { connection }
@@ -57,6 +58,17 @@ impl<'a> FlashCommands<'a> {
         let packet = Packet::new(Command::Erase, address, data);
         self.connection.send_command(packet).await?;
         Ok(())
+    }
+
+    pub async fn read_status(&mut self) -> Result<u8> {
+        let packet = Packet::new(Command::Status, 0, Vec::new());
+        let response = self.connection.send_command(packet).await?;
+
+        if response.data.is_empty() {
+            return Err(anyhow::anyhow!("Empty status response"));
+        }
+
+        Ok(response.data[0])
     }
 
     pub async fn write(&mut self, address: u32, data: &[u8]) -> Result<()> {
@@ -140,10 +152,16 @@ impl<'a> FlashCommands<'a> {
         let mut sequence: u16 = 1;
 
         while remaining_size > 0 {
-            let chunk_size = std::cmp::min(remaining_size, MAX_PAYLOAD_SIZE as u32);
-            let data = chunk_size.to_le_bytes().to_vec();
+            // Use smaller chunks for read operations to match firmware limitations
+            const MAX_READ_SIZE: u32 = 256;
+            let chunk_size = std::cmp::min(remaining_size, MAX_READ_SIZE);
 
-            let packet = Packet::new(Command::Read, current_address, data);
+            // Use the correct protocol format - empty data field, size in length field
+            let mut packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
+            packet.length = chunk_size;
+            // Recalculate CRC after modifying length field
+            packet.crc = packet.calculate_crc();
+
             let response = self.connection.send_command(packet).await
                 .with_context(|| format!("Failed to read at address 0x{:08X}", current_address))?;
 
@@ -261,12 +279,12 @@ impl<'a> FlashCommands<'a> {
             while retries > 0 {
                 match self.connection.send_command(final_packet.clone()).await {
                     Ok(_) => break,
-                    Err(e) if retries > 1 => {
+                    Err(_e) if retries > 1 => {
                         retries -= 1;
                         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
                         continue;
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // If final confirmation fails but all data was sent, consider it a success
                         eprintln!("Warning: Final confirmation failed, but {} bytes were successfully transmitted", written);
                         break;
@@ -289,12 +307,16 @@ impl<'a> FlashCommands<'a> {
         progress.set_position(0);
 
         while !remaining_data.is_empty() {
-            let chunk_size = std::cmp::min(remaining_data.len(), MAX_PAYLOAD_SIZE);
+            // Use smaller chunks for read operations to match firmware limitations
+            const MAX_READ_SIZE: usize = 256;
+            let chunk_size = std::cmp::min(remaining_data.len(), MAX_READ_SIZE);
             let expected_chunk = &remaining_data[..chunk_size];
 
             // Read back the data - use length field instead of data field for size
             let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             read_packet.length = chunk_size as u32;
+            // Recalculate CRC after modifying length field
+            read_packet.crc = read_packet.calculate_crc();
             let response = self.connection.send_command(read_packet).await
                 .with_context(|| format!("Failed to read back data at address 0x{:08X}", current_address))?;
 
@@ -360,11 +382,15 @@ impl<'a> FlashCommands<'a> {
         let mut sequence: u16 = 1;
 
         while remaining_size > 0 {
-            let chunk_size = std::cmp::min(remaining_size, MAX_PAYLOAD_SIZE as u32);
+            // Use smaller chunks for read operations to match firmware limitations
+            const MAX_READ_SIZE: u32 = 256;
+            let chunk_size = std::cmp::min(remaining_size, MAX_READ_SIZE);
 
             // Read back the data - use length field for size
             let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             read_packet.length = chunk_size;
+            // Recalculate CRC after modifying length field
+            read_packet.crc = read_packet.calculate_crc();
 
             let response = self.connection.send_command(read_packet).await
                 .with_context(|| format!("Failed to read flash data at address 0x{:08X}", current_address))?;

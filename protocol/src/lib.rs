@@ -59,6 +59,8 @@ pub enum Command {
     StreamWrite = 0x08,
     /// Verify data integrity using CRC32
     VerifyCRC = 0x09,
+    /// Read flash status register
+    Status = 0x0A,
 }
 
 /// Status codes for responses
@@ -222,6 +224,8 @@ impl Packet {
             0x06 => Command::BatchWrite,
             0x07 => Command::BatchAck,
             0x08 => Command::StreamWrite,
+            0x09 => Command::VerifyCRC,
+            0x0A => Command::Status,
             _ => return Err("Invalid command"),
         };
 

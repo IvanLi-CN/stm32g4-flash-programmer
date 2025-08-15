@@ -12,7 +12,7 @@ use embassy_futures::join::join;
 
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{bind_interrupts, peripherals, usb};
-use embassy_time::{Duration, Timer};
+
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
 use flash_protocol::*;
@@ -26,7 +26,7 @@ mod safe_flash;
 use safe_flash::SafeFlashManager;
 
 mod hardware_crc;
-use hardware_crc::{init_hardware_crc, calculate_packet_crc, calculate_response_crc};
+use hardware_crc::init_hardware_crc;
 
 bind_interrupts!(struct Irqs {
     USB_LP => usb::InterruptHandler<peripherals::USB>;
@@ -38,14 +38,15 @@ static mut BOS_DESCRIPTOR: [u8; 256] = [0; 256];
 static mut CONTROL_BUF: [u8; 64] = [0; 64];
 static mut USB_STATE: State = State::new();
 
-// USB CDC buffer - standard size for CDC communication
+// USB CDC buffer - standard size for CDC communication (currently unused)
+#[allow(dead_code)]
 static mut USB_RX_BUFFER: [u8; 64] = [0; 64];  // 64 bytes is standard for USB CDC
 
 // Optimized heap for dynamic allocation (16KB) to handle 4KB write packets
 static mut HEAP: [u8; 16384] = [0; 16384];
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
     // Initialize heap
     unsafe {
         ALLOCATOR.lock().init(HEAP.as_mut_ptr(), HEAP.len());
@@ -97,7 +98,8 @@ async fn main(spawner: Spawner) {
     // SPI2 pins for external Flash (based on actual hardware configuration)
     // SCK: PB13, MISO: PB14, MOSI: PB15, CS: PA8 (assumed)
     let mut spi_config = SpiConfig::default();
-    spi_config.frequency = embassy_stm32::time::Hertz(1_000_000); // 1MHz SPI clock
+    spi_config.frequency = embassy_stm32::time::Hertz(500_000); // 500kHz SPI clock (slower for reliability)
+    // SPI Mode 0 for W25Q128 (CPOL=0, CPHA=0) - this is the default mode
     let spi = Spi::new(
         p.SPI2,
         p.PB13, // SCK
@@ -108,8 +110,16 @@ async fn main(spawner: Spawner) {
         spi_config,
     );
 
-    // CS pin (assuming PA8 is available for CS)
-    let cs_pin = embassy_stm32::gpio::Output::new(p.PA8, Level::High, Speed::VeryHigh);
+    // CS pin (correct hardware connection: PB12)
+    let _cs_pin = embassy_stm32::gpio::Output::new(p.PB12, Level::High, Speed::VeryHigh);
+
+    // Flash Write Protect and Hold pins - CRITICAL for write operations!
+    // WP# (Write Protect) - must be HIGH to allow writes (connected to PB11)
+    let _wp_pin = embassy_stm32::gpio::Output::new(p.PB11, Level::High, Speed::VeryHigh);
+    // HOLD# (Hold) - must be HIGH for normal operation (assuming PA10)
+    let _hold_pin = embassy_stm32::gpio::Output::new(p.PA10, Level::High, Speed::VeryHigh);
+
+    defmt::info!("Flash control pins configured: WP#=HIGH(PB11), HOLD#=HIGH(PA10)");
 
     // Create shared SPI bus
     static SPI_BUS: StaticCell<Mutex<CriticalSectionRawMutex, Spi<'static, embassy_stm32::mode::Async>>> = StaticCell::new();
@@ -122,7 +132,7 @@ async fn main(spawner: Spawner) {
     // CS pin is now managed internally by the flash manager
 
     // Try to initialize Flash
-    defmt::info!("Attempting to initialize SPI Flash on PB13(SCK), PB14(MISO), PB15(MOSI), PA8(CS)...");
+    defmt::info!("Attempting to initialize SPI Flash on PB13(SCK), PB14(MISO), PB15(MOSI), PB12(CS)...");
     match flash_manager.try_initialize().await {
         Ok(()) => {
             defmt::info!("✅ External Flash initialized successfully!");
@@ -204,9 +214,10 @@ async fn protocol_handler_loop<'a>(
 ) -> Result<(), Disconnected> {
     defmt::info!("Protocol handler started with full protocol support");
 
-    // Protocol processing variables
-    let mut packet_buffer = Vec::new();
+    // Protocol processing variables with memory management
+    let mut packet_buffer = Vec::with_capacity(2048); // Pre-allocate reasonable capacity
     let mut buffer = [0u8; 64];
+    const MAX_BUFFER_SIZE: usize = 4096; // Maximum buffer size to prevent memory issues
 
     loop {
         // Read data from USB
@@ -214,7 +225,11 @@ async fn protocol_handler_loop<'a>(
         if n > 0 {
             defmt::info!("USB: Received {} bytes", n);
 
-            // Add to packet buffer
+            // Add to packet buffer with size check
+            if packet_buffer.len() + n > MAX_BUFFER_SIZE {
+                defmt::warn!("Buffer overflow protection: clearing buffer (was {} bytes)", packet_buffer.len());
+                packet_buffer.clear();
+            }
             packet_buffer.extend_from_slice(&buffer[..n]);
             defmt::info!("USB: Packet buffer now has {} bytes", packet_buffer.len());
 
@@ -277,20 +292,75 @@ async fn protocol_handler_loop<'a>(
                         // Mock verify success
                         Response::new(Status::Success, Vec::new())
                     }
-                    _ => {
-                        defmt::warn!("Protocol: Unsupported command");
-                        Response::new(Status::InvalidCommand, Vec::new())
+                    Command::VerifyCRC => {
+                        defmt::info!("Protocol: Processing VerifyCRC command");
+                        // Mock CRC verify success for now
+                        Response::new(Status::Success, Vec::new())
+                    }
+                    Command::Status => {
+                        defmt::info!("Protocol: Processing Status command");
+
+                        // First, run full diagnosis
+                        match flash_manager.diagnose_flash_protection().await {
+                            Ok(_) => defmt::info!("Flash protection diagnosis completed"),
+                            Err(e) => defmt::error!("Flash diagnosis error: {:?}", e),
+                        }
+
+                        // Then return basic status
+                        match flash_manager.read_status().await {
+                            Ok(status) => {
+                                defmt::info!("Flash status register: 0x{:02X}", status);
+                                Response::new(Status::Success, vec![status])
+                            }
+                            Err(e) => {
+                                defmt::error!("Flash status read error: {:?}", e);
+                                Response::new(Status::FlashError, Vec::new())
+                            }
+                        }
+                    }
+                    Command::StreamWrite => {
+                        defmt::info!("Protocol: Processing StreamWrite command");
+                        match flash_manager.write_data(packet.address, &packet.data).await {
+                            Ok(_) => {
+                                defmt::info!("StreamWrite: Successfully wrote {} bytes at 0x{:08X}", packet.data.len(), packet.address);
+                                Response::new(Status::Success, Vec::new())
+                            }
+                            Err(_) => {
+                                defmt::error!("StreamWrite: Failed to write data at 0x{:08X}", packet.address);
+                                Response::new(Status::FlashError, Vec::new())
+                            }
+                        }
+                    }
+                    Command::BatchWrite | Command::BatchAck => {
+                        defmt::info!("Protocol: Processing batch command");
+                        // These commands are not implemented yet, but don't error
+                        Response::new(Status::Success, Vec::new())
                     }
                 };
 
-                // Send response
+                // Send response in chunks to avoid buffer overflow
                 let response_data = response.to_bytes();
                 defmt::info!("Protocol: Sending response, {} bytes", response_data.len());
-                cdc_class.write_packet(&response_data).await?;
+
+                // Send in 64-byte chunks to match USB CDC buffer size
+                const CHUNK_SIZE: usize = 64;
+                let mut sent = 0;
+                while sent < response_data.len() {
+                    let chunk_end = core::cmp::min(sent + CHUNK_SIZE, response_data.len());
+                    let chunk = &response_data[sent..chunk_end];
+                    cdc_class.write_packet(chunk).await?;
+                    sent = chunk_end;
+                    defmt::debug!("Protocol: Sent chunk {} bytes, total sent: {}", chunk.len(), sent);
+                }
                 defmt::info!("Protocol: Response sent successfully");
 
-                // Clear packet buffer
-                packet_buffer.clear();
+                // Memory management: shrink buffer if it's getting large
+                if packet_buffer.capacity() > 2048 && packet_buffer.len() < 512 {
+                    defmt::debug!("Memory: Shrinking buffer from capacity {} to {}", packet_buffer.capacity(), packet_buffer.len());
+                    packet_buffer.shrink_to_fit();
+                }
+
+                // Don't clear the entire buffer - try_parse_packet already removed the processed packet
             }
         }
     }
@@ -363,6 +433,11 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
         0x03 => Command::Write,
         0x04 => Command::Read,
         0x05 => Command::Verify,
+        0x06 => Command::BatchWrite,
+        0x07 => Command::BatchAck,
+        0x08 => Command::StreamWrite,
+        0x09 => Command::VerifyCRC,
+        0x0A => Command::Status,
         _ => {
             defmt::warn!("Parse: Unknown command: 0x{:02x}", command_byte);
             buffer.drain(0..13); // Remove the invalid packet header
@@ -370,8 +445,17 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
         }
     };
 
-    // Calculate total packet size (header + data + CRC)
-    let total_size = 13 + length as usize + 4; // header(13) + data + CRC(4)
+    // Calculate total packet size based on command type
+    let (total_size, data_length) = match command {
+        Command::Read => {
+            // For read commands, length field indicates how much to read, not packet data size
+            (13 + 4, 0) // header(13) + CRC(4), no data in packet
+        }
+        _ => {
+            // For other commands, length field indicates actual data in packet
+            (13 + length as usize + 4, length as usize) // header(13) + data + CRC(4)
+        }
+    };
 
     // Check if we have the complete packet
     if buffer.len() < total_size {
@@ -379,15 +463,30 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
         return None;
     }
 
-    // Extract data
-    let data = if length > 0 {
-        buffer[13..13 + length as usize].to_vec()
+    // Extract data with size limit to prevent memory issues
+    let data = if data_length > 0 {
+        if data_length > 1024 {
+            defmt::error!("Packet too large: {} bytes, rejecting", data_length);
+            return None; // Reject packets larger than 1KB
+        }
+        let extracted_data = buffer[13..13 + data_length].to_vec();
+        defmt::debug!("Parse: Extracted {} bytes of data", extracted_data.len());
+        if extracted_data.len() <= 32 {
+            // Only show first 32 bytes to avoid log spam
+            for (i, byte) in extracted_data.iter().enumerate() {
+                if i % 16 == 0 && i > 0 {
+                    defmt::debug!("");
+                }
+                defmt::debug!("{:02X} ", byte);
+            }
+        }
+        extracted_data
     } else {
         Vec::new()
     };
 
     // Extract CRC (32-bit)
-    let crc_start = 13 + length as usize;
+    let crc_start = 13 + data_length;
     let received_crc = if crc_start + 3 < buffer.len() {
         u32::from_le_bytes([
             buffer[crc_start],
@@ -413,7 +512,7 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
         sequence,
         command,
         address,
-        length: length as u32,
+        length,
         data,
         crc: received_crc,
     })

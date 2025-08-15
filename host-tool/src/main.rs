@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use flash_protocol::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -38,6 +37,8 @@ struct Cli {
 enum Commands {
     /// Get flash information
     Info,
+    /// Read flash status register
+    Status,
     /// Erase flash sectors
     Erase {
         /// Start address (hex)
@@ -61,6 +62,9 @@ enum Commands {
         /// Verify after writing
         #[arg(short, long)]
         verify: bool,
+        /// Use basic write command instead of stream write
+        #[arg(short, long)]
+        basic: bool,
     },
     /// Read flash to file
     Read {
@@ -121,11 +125,24 @@ async fn main() -> Result<()> {
             let info = flash_commands.get_info().await?;
             println!("Flash Information:");
             println!("  JEDEC ID: 0x{:06X}", info.jedec_id);
-            println!("  Total Size: {} MB ({} bytes)", 
+            println!("  Total Size: {} MB ({} bytes)",
                      info.total_size / (1024 * 1024), info.total_size);
             println!("  Page Size: {} bytes", info.page_size);
-            println!("  Sector Size: {} KB ({} bytes)", 
+            println!("  Sector Size: {} KB ({} bytes)",
                      info.sector_size / 1024, info.sector_size);
+        }
+
+        Commands::Status => {
+            println!("Reading flash status register...");
+            let status = flash_commands.read_status().await?;
+
+            println!("Flash Status Register: 0x{:02X}", status);
+            println!("  Write In Progress (WIP): {}", if status & 0x01 != 0 { "Yes" } else { "No" });
+            println!("  Write Enable Latch (WEL): {}", if status & 0x02 != 0 { "Yes" } else { "No" });
+            println!("  Block Protect Bits (BP0-BP2): 0x{:01X}", (status >> 2) & 0x07);
+            println!("  Top/Bottom Protect (TB): {}", if status & 0x20 != 0 { "Top" } else { "Bottom" });
+            println!("  Sector Protect (SEC): {}", if status & 0x40 != 0 { "Yes" } else { "No" });
+            println!("  Status Register Protect (SRP0): {}", if status & 0x80 != 0 { "Yes" } else { "No" });
         }
 
         Commands::Erase { address, size } => {
@@ -143,7 +160,7 @@ async fn main() -> Result<()> {
             println!("Flash erased successfully!");
         }
 
-        Commands::Write { file, address, erase, verify } => {
+        Commands::Write { file, address, erase, verify, basic } => {
             println!("Reading file: {:?}", file);
             let data = fs::read(&file).await
                 .with_context(|| format!("Failed to read file: {:?}", file))?;
@@ -163,15 +180,34 @@ async fn main() -> Result<()> {
                 .unwrap());
 
             if verify {
-                // Use write with automatic verification for maximum data integrity
-                flash_commands.write_and_verify_with_progress(address, &data, &pb).await?;
+                // Write first
+                if basic {
+                    flash_commands.write(address, &data).await?;
+                    pb.set_position(data.len() as u64);
+                } else {
+                    flash_commands.write_with_progress(address, &data, &pb).await?;
+                }
+                pb.finish_with_message("Write completed!");
+
+                // Then verify by reading back data (real verification)
+                println!("Verifying written data by reading back...");
+                flash_commands.verify_write(address, &data, &pb).await?;
                 pb.finish_with_message("Write and verification completed!");
                 println!("✅ Data written and verified successfully!");
             } else {
-                // Use high-speed write only
-                flash_commands.write_with_progress(address, &data, &pb).await?;
-                pb.finish_with_message("Write completed!");
-                println!("✅ Data written successfully!");
+                if basic {
+                    // Use basic write command
+                    println!("Using basic write command...");
+                    flash_commands.write(address, &data).await?;
+                    pb.set_position(data.len() as u64);
+                    pb.finish_with_message("Basic write completed!");
+                    println!("✅ Data written successfully using basic write command!");
+                } else {
+                    // Use high-speed write only
+                    flash_commands.write_with_progress(address, &data, &pb).await?;
+                    pb.finish_with_message("Write completed!");
+                    println!("✅ Data written successfully!");
+                }
                 println!("⚠️  Warning: Data was not verified. Use --verify flag to ensure data integrity.");
             }
         }

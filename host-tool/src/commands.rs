@@ -137,6 +137,7 @@ impl<'a> FlashCommands<'a> {
         let mut current_address = address;
         let mut remaining_size = size;
         let mut read_bytes = 0;
+        let mut sequence: u16 = 1;
 
         while remaining_size > 0 {
             let chunk_size = std::cmp::min(remaining_size, MAX_PAYLOAD_SIZE as u32);
@@ -150,7 +151,8 @@ impl<'a> FlashCommands<'a> {
             current_address += chunk_size;
             remaining_size -= chunk_size;
             read_bytes += chunk_size;
-            
+            sequence = sequence.wrapping_add(1);
+
             progress.set_position(read_bytes as u64);
         }
 

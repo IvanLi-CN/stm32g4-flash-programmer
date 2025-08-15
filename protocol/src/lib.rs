@@ -12,10 +12,14 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use crc::{Crc, CRC_16_IBM_SDLC};
+// Hardware CRC-32 will be used on STM32 side
+// Software fallback for host tools
+#[cfg(feature = "std")]
+use crc::{Crc, CRC_32_ISO_HDLC};
 
-/// CRC-16 calculator for packet integrity
-pub const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_IBM_SDLC);
+#[cfg(feature = "std")]
+/// CRC-32 calculator for packet integrity (software fallback)
+pub const CRC32: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 
 /// Magic numbers for packet synchronization
 pub const PACKET_MAGIC: u16 = 0xABCD;
@@ -96,8 +100,8 @@ pub struct Packet {
     pub sequence: u16,
     /// Data payload
     pub data: Vec<u8>,
-    /// CRC16 checksum
-    pub crc: u16,
+    /// CRC32 checksum
+    pub crc: u32,
 }
 
 /// Response packet structure
@@ -111,8 +115,8 @@ pub struct Response {
     pub length: u32,
     /// Response data
     pub data: Vec<u8>,
-    /// CRC16 checksum
-    pub crc: u16,
+    /// CRC32 checksum
+    pub crc: u32,
 }
 
 impl Packet {
@@ -137,8 +141,9 @@ impl Packet {
     }
 
     /// Calculate CRC for the packet
-    pub fn calculate_crc(&self) -> u16 {
-        let mut digest = CRC16.digest();
+    #[cfg(feature = "std")]
+    pub fn calculate_crc(&self) -> u32 {
+        let mut digest = CRC32.digest();
         digest.update(&self.magic.to_le_bytes());
         digest.update(&[self.command as u8]);
         digest.update(&self.length.to_le_bytes());
@@ -146,6 +151,37 @@ impl Packet {
         digest.update(&self.sequence.to_le_bytes());
         digest.update(&self.data);
         digest.finalize()
+    }
+
+    /// Calculate CRC for the packet (no-std version, temporary software fallback)
+    #[cfg(not(feature = "std"))]
+    pub fn calculate_crc(&self) -> u32 {
+        // Temporary software CRC implementation for compatibility
+        // TODO: Re-enable hardware CRC after debugging
+        let mut crc = 0xFFFFFFFFu32;
+
+        // Simple CRC-32 calculation (not optimized, but compatible)
+        let data = [
+            &self.magic.to_le_bytes()[..],
+            &[self.command as u8],
+            &self.length.to_le_bytes()[..],
+            &self.address.to_le_bytes()[..],
+            &self.sequence.to_le_bytes()[..],
+            &self.data[..],
+        ].concat();
+
+        for &byte in &data {
+            crc ^= byte as u32;
+            for _ in 0..8 {
+                if crc & 1 != 0 {
+                    crc = (crc >> 1) ^ 0xEDB88320;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+
+        !crc
     }
 
     /// Verify packet integrity
@@ -168,7 +204,7 @@ impl Packet {
 
     /// Deserialize packet from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
-        if bytes.len() < 15 {
+        if bytes.len() < 17 {
             return Err("Packet too short");
         }
 
@@ -193,14 +229,16 @@ impl Packet {
         let address = u32::from_le_bytes([bytes[7], bytes[8], bytes[9], bytes[10]]);
         let sequence = u16::from_le_bytes([bytes[11], bytes[12]]);
 
-        if bytes.len() < 15 + length as usize {
+        if bytes.len() < 17 + length as usize {
             return Err("Incomplete packet");
         }
 
         let data = bytes[13..13 + length as usize].to_vec();
-        let crc = u16::from_le_bytes([
+        let crc = u32::from_le_bytes([
             bytes[13 + length as usize],
             bytes[14 + length as usize],
+            bytes[15 + length as usize],
+            bytes[16 + length as usize],
         ]);
 
         let packet = Self {
@@ -236,13 +274,43 @@ impl Response {
     }
 
     /// Calculate CRC for the response
-    pub fn calculate_crc(&self) -> u16 {
-        let mut digest = CRC16.digest();
+    #[cfg(feature = "std")]
+    pub fn calculate_crc(&self) -> u32 {
+        let mut digest = CRC32.digest();
         digest.update(&self.magic.to_le_bytes());
         digest.update(&[self.status as u8]);
         digest.update(&self.length.to_le_bytes());
         digest.update(&self.data);
         digest.finalize()
+    }
+
+    /// Calculate CRC for the response (no-std version, temporary software fallback)
+    #[cfg(not(feature = "std"))]
+    pub fn calculate_crc(&self) -> u32 {
+        // Temporary software CRC implementation for compatibility
+        // TODO: Re-enable hardware CRC after debugging
+        let mut crc = 0xFFFFFFFFu32;
+
+        // Simple CRC-32 calculation (not optimized, but compatible)
+        let data = [
+            &self.magic.to_le_bytes()[..],
+            &[self.status as u8],
+            &self.length.to_le_bytes()[..],
+            &self.data[..],
+        ].concat();
+
+        for &byte in &data {
+            crc ^= byte as u32;
+            for _ in 0..8 {
+                if crc & 1 != 0 {
+                    crc = (crc >> 1) ^ 0xEDB88320;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+
+        !crc
     }
 
     /// Verify response integrity
@@ -263,7 +331,7 @@ impl Response {
 
     /// Deserialize response from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
-        if bytes.len() < 9 {
+        if bytes.len() < 11 {
             return Err("Response too short");
         }
 
@@ -285,14 +353,16 @@ impl Response {
 
         let length = u32::from_le_bytes([bytes[3], bytes[4], bytes[5], bytes[6]]);
 
-        if bytes.len() < 9 + length as usize {
+        if bytes.len() < 11 + length as usize {
             return Err("Incomplete response");
         }
 
         let data = bytes[7..7 + length as usize].to_vec();
-        let crc = u16::from_le_bytes([
+        let crc = u32::from_le_bytes([
             bytes[7 + length as usize],
             bytes[8 + length as usize],
+            bytes[9 + length as usize],
+            bytes[10 + length as usize],
         ]);
 
         let response = Self {

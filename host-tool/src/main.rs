@@ -189,9 +189,9 @@ async fn main() -> Result<()> {
                 }
                 pb.finish_with_message("Write completed!");
 
-                // Then verify by reading back data (real verification)
-                println!("Verifying written data by reading back...");
-                flash_commands.verify_write(address, &data, &pb).await?;
+                // Then verify using progressive CRC (fast and reliable verification)
+                println!("Verifying written data using progressive CRC32...");
+                flash_commands.verify_with_progressive_crc(address, &data, &pb).await?;
                 pb.finish_with_message("Write and verification completed!");
                 println!("✅ Data written and verified successfully!");
             } else {
@@ -243,7 +243,7 @@ async fn main() -> Result<()> {
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.yellow/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap());
 
-            flash_commands.verify_with_progress(address, &data, &pb).await?;
+            flash_commands.verify_with_progressive_crc(address, &data, &pb).await?;
             
             pb.finish_with_message("Verification completed!");
             println!("Verification successful!");

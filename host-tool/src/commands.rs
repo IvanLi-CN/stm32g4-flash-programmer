@@ -130,9 +130,11 @@ impl<'a> FlashCommands<'a> {
 
         while remaining_size > 0 {
             let chunk_size = std::cmp::min(remaining_size, MAX_PAYLOAD_SIZE as u32);
-            let data = chunk_size.to_le_bytes().to_vec();
 
-            let packet = Packet::new(Command::Read, current_address, data);
+            // For read commands, use length field for size, data field should be empty
+            let mut packet = Packet::new(Command::Read, current_address, Vec::new());
+            packet.length = chunk_size;
+            packet.crc = packet.calculate_crc();
             let response = self.connection.send_command(packet).await
                 .with_context(|| format!("Failed to read at address 0x{:08X}", current_address))?;
 
@@ -226,8 +228,8 @@ impl<'a> FlashCommands<'a> {
         let mut written = 0;
         let mut sequence: u16 = 1;
 
-        // Optimized batch processing inspired by libusb multi-URB approach
-        let batch_size = 16; // Send 16 packets at once for maximum throughput
+        // Reduced batch processing for reliability
+        let batch_size = 4; // Send 4 packets at once for better reliability
         let mut batch_packets = Vec::with_capacity(batch_size);
 
         while !remaining_data.is_empty() {
@@ -263,8 +265,8 @@ impl<'a> FlashCommands<'a> {
 
             progress.set_position(written as u64);
 
-            // Very small delay to allow USB controller to process the batch
-            tokio::time::sleep(tokio::time::Duration::from_micros(100)).await;
+            // Increased delay to allow Flash controller to process the batch
+            tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
 
         // Send one final regular Write command to confirm completion with extended timeout
@@ -312,20 +314,37 @@ impl<'a> FlashCommands<'a> {
             let chunk_size = std::cmp::min(remaining_data.len(), MAX_READ_SIZE);
             let expected_chunk = &remaining_data[..chunk_size];
 
-            // Read back the data - use length field instead of data field for size
+            // Read back the data - use length field for size, data field should be empty
             let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             read_packet.length = chunk_size as u32;
-            // Recalculate CRC after modifying length field
             read_packet.crc = read_packet.calculate_crc();
             let response = self.connection.send_command(read_packet).await
                 .with_context(|| format!("Failed to read back data at address 0x{:08X}", current_address))?;
 
             // Compare with expected data
             if response.data != expected_chunk {
-                return Err(anyhow::anyhow!(
-                    "Data verification failed at address 0x{:08X}: expected {} bytes, got {} bytes",
-                    current_address, expected_chunk.len(), response.data.len()
-                ));
+                // Find first differing byte for better error reporting
+                let mut first_diff = None;
+                for (i, (expected, actual)) in expected_chunk.iter().zip(response.data.iter()).enumerate() {
+                    if expected != actual {
+                        first_diff = Some((i, *expected, *actual));
+                        break;
+                    }
+                }
+
+                let error_msg = if let Some((offset, expected, actual)) = first_diff {
+                    format!(
+                        "Data verification failed at address 0x{:08X}: first difference at offset {}: expected 0x{:02X}, got 0x{:02X}",
+                        current_address, offset, expected, actual
+                    )
+                } else {
+                    format!(
+                        "Data verification failed at address 0x{:08X}: expected {} bytes, got {} bytes",
+                        current_address, expected_chunk.len(), response.data.len()
+                    )
+                };
+
+                return Err(anyhow::anyhow!(error_msg));
             }
 
             current_address += chunk_size as u32;
@@ -439,16 +458,79 @@ impl<'a> FlashCommands<'a> {
         }
     }
 
-    /// High-speed write with CRC-based verification
+    /// Progressive block-based CRC verification for large files
+    pub async fn verify_with_progressive_crc(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+        const VERIFY_BLOCK_SIZE: usize = 64 * 1024; // 64KB per block
+
+        let mut current_address = address;
+        let mut remaining_data = data;
+        let mut block_index = 0;
+        let total_blocks = (data.len() + VERIFY_BLOCK_SIZE - 1) / VERIFY_BLOCK_SIZE;
+
+        progress.set_message("Starting progressive CRC verification...");
+        progress.set_position(0);
+
+        while !remaining_data.is_empty() {
+            let block_size = std::cmp::min(remaining_data.len(), VERIFY_BLOCK_SIZE);
+            let block_data = &remaining_data[..block_size];
+
+            // Calculate CRC32 for this block
+            let mut hasher = Hasher::new();
+            hasher.update(block_data);
+            let expected_crc = hasher.finalize();
+
+            // Verify this block
+            progress.set_message("Verifying block...");
+
+            // Send block CRC verification command to firmware
+            let mut crc_data = Vec::new();
+            crc_data.extend_from_slice(&expected_crc.to_le_bytes());
+            crc_data.extend_from_slice(&(block_size as u32).to_le_bytes());
+
+            let verify_packet = Packet::new_with_sequence(Command::VerifyCRC, current_address, crc_data, (block_index + 1) as u16);
+
+            match self.connection.send_command(verify_packet).await {
+                Ok(response) => {
+                    if response.status == Status::Success {
+                        progress.set_message("✅ Block verified successfully!");
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "❌ Block {} CRC verification failed at address 0x{:08X} (expected CRC: 0x{:08X})",
+                            block_index + 1, current_address, expected_crc
+                        ));
+                    }
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "❌ Block {} verification communication error at address 0x{:08X}: {}",
+                        block_index + 1, current_address, e
+                    ));
+                }
+            }
+
+            current_address += block_size as u32;
+            remaining_data = &remaining_data[block_size..];
+            block_index += 1;
+
+            progress.set_position((data.len() - remaining_data.len()) as u64);
+
+            // Small delay between blocks to avoid overwhelming the firmware
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+
+        progress.set_message("🎉 All blocks verified successfully!");
+        Ok(())
+    }
+
+    /// High-speed write with progressive CRC-based verification
     pub async fn write_and_verify_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
         // Phase 1: High-speed write
         progress.set_message("Writing data to flash...");
         self.stream_write_with_progress(address, data, progress).await?;
 
-        // Phase 2: CRC-based verification (much faster and more reliable)
-        progress.set_message("Performing CRC verification...");
-        progress.set_position(data.len() as u64); // Show as complete for CRC
-        self.verify_with_crc(address, data, progress).await?;
+        // Phase 2: Progressive CRC-based verification (much faster and more reliable)
+        progress.set_message("Performing progressive CRC verification...");
+        self.verify_with_progressive_crc(address, data, progress).await?;
 
         Ok(())
     }

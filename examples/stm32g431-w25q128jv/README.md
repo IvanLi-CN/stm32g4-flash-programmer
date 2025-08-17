@@ -1,15 +1,128 @@
-# W25Q128JV 资源库方案
+# Flash Content Viewer
 
-针对 W25Q128JV 16MB SPI Flash 存储器的完整资源管理方案，用于 STM32G4 Flash 编程器项目。
+基于 STM32G431CBU6 的 W25Q128JV Flash 内容显示器固件，能够在 GC9307 TFT 显示屏上显示外部 Flash 中存储的资源内容。
 
-## 概述
+## 🎯 功能特性
 
-本方案为 W25Q128JV Flash 存储器提供了完整的资源管理解决方案，包括：
-- 字库管理（中文字体支持）
-- 图片资源存储（开机屏幕、UI 图标）
-- 应用数据存储
-- 配置文件管理
-- 固件更新区域
+- **双 SPI 总线管理**：SPI1 连接 GC9307 显示屏，SPI2 连接 W25Q128JV Flash
+- **交互式资源浏览器**：通过按钮控制的图形界面浏览 Flash 资源
+- **多种显示模式**：
+  - 资源列表视图：显示所有可用的资源区域
+  - 资源详情视图：显示选中资源的详细信息和数据预览
+  - 十六进制转储：显示原始数据的十六进制格式
+- **智能缓存系统**：LRU 缓存机制提高数据读取性能
+- **完整的资源解析**：支持字体位图、RGB565 图片等格式
+
+## 🔌 硬件配置
+
+### STM32G431CBU6 引脚分配
+
+| 功能 | 引脚 | SPI总线 | 用途 |
+|------|------|---------|------|
+| **W25Q128JV Flash** | | **SPI2** | |
+| SCK | PB13 | SPI2 | 时钟 |
+| MOSI | PB15 | SPI2 | 主出从入 |
+| MISO | PB14 | SPI2 | 主入从出 |
+| CS | PB12 | - | 片选 |
+| WP# | PB11 | - | 写保护 |
+| HOLD# | PA10 | - | 保持 |
+| **GC9307 显示屏** | | **SPI1** | |
+| SCK | PB3 | SPI1 | 时钟 |
+| MOSI | PB5 | SPI1 | 数据 |
+| CS | PA15 | - | 片选 |
+| DC | PC14 | - | 数据/命令 |
+| RST | PC15 | - | 复位 |
+| **用户交互** | | | |
+| 按钮1 | PC10 | - | 上一项/返回 |
+| 按钮3 | PC13 | - | 下一项/选择 |
+
+## 🚀 构建和使用
+
+### 构建固件
+
+```bash
+# 检查代码
+cargo check
+
+# 构建 Debug 版本
+cargo build
+
+# 构建 Release 版本
+cargo build --release
+
+# 或使用提供的脚本
+./build.sh
+```
+
+### 烧录固件
+
+```bash
+# 使用 probe-rs 烧录
+probe-rs run --chip STM32G431CBU6 target/thumbv7em-none-eabihf/release/flash-content-viewer
+
+# 或使用 st-flash
+st-flash write target/thumbv7em-none-eabihf/release/flash-content-viewer.bin 0x8000000
+```
+
+### 用户操作
+
+1. **启动**：固件启动后显示欢迎界面和 Flash 状态
+2. **浏览资源**：
+   - 按钮1 (PC10)：向上导航/上一项
+   - 按钮3 (PC13)：向下导航/选择项目
+3. **查看详情**：在资源列表中按按钮3进入详情视图
+4. **返回列表**：在详情视图中按按钮3返回列表
+
+## 📁 项目结构
+
+```
+src/
+├── main.rs              # 主程序入口和应用逻辑
+├── hardware/            # 硬件抽象层
+│   ├── flash.rs         # Flash 管理器
+│   ├── display.rs       # 显示管理器
+│   └── spi_bus.rs       # SPI 总线工具
+├── resources/           # 资源管理系统
+│   ├── layout.rs        # 内存布局定义
+│   ├── font_parser.rs   # 字体解析器
+│   ├── image_parser.rs  # 图片解析器
+│   └── cache.rs         # 缓存系统
+└── ui/                  # 用户界面组件
+    ├── app.rs           # 应用框架
+    ├── font_viewer.rs   # 字体查看器
+    └── image_viewer.rs  # 图片查看器
+```
+
+## 🔧 技术特点
+
+- **异步架构**：基于 Embassy 框架的异步编程
+- **内存高效**：8KB 堆内存，智能缓存管理
+- **模块化设计**：清晰的硬件抽象和资源管理分层
+- **错误处理**：完善的错误处理和状态反馈
+- **可扩展性**：预留接口支持更多资源类型和显示功能
+
+## 📝 开发说明
+
+当前版本为基础框架实现，包含：
+
+- ✅ 完整的项目结构和编译系统
+- ✅ 硬件初始化和 SPI 总线管理
+- ✅ 基础的用户界面和交互逻辑
+- ✅ 资源布局定义和解析框架
+- 🔄 简化的显示和 Flash 操作（用于演示）
+
+未来可扩展功能：
+
+- 真实的 GC9307 显示驱动集成
+- 完整的 W25Q128JV Flash 读取功能
+- 字体和图片的实际渲染显示
+- 更丰富的用户界面和交互
+
+---
+
+# 原始资源库方案文档
+
+以下是原始的 W25Q128JV 资源库方案，包含完整的资源管理和工具集：
 
 ## Flash 存储器规格
 
@@ -98,33 +211,6 @@ python3 resource_manager.py
 - 生成完整的内存布局规划
 - 创建 C 头文件定义
 - 输出 JSON 格式的资源表
-
-## 使用方法
-
-### 1. 生成所有资源
-```bash
-cd examples/w25q128jv/tools
-python3 svg_to_rgb565.py      # 生成开机屏幕
-python3 font_converter.py     # 转换字体
-python3 resource_manager.py   # 生成内存布局
-```
-
-### 2. 在项目中使用
-参考 `assets/memory_map.txt` 文件中的地址定义：
-
-- 开机屏幕地址: 0x00000000 (108KB)
-- 位图字体地址: 0x00020000 (52KB，分配2MB空间)
-- UI 图形地址: 0x00220000 (2MB)
-
-### 3. 编程到 Flash
-使用项目中的 Flash 编程器工具：
-```bash
-# 编程开机屏幕 (108KB)
-st-flash write assets/boot_screen_320x172.bin 0x000000
-
-# 编程位图字体 (52KB)
-st-flash write assets/font_output/font_bitmap.bin 0x00020000
-```
 
 ## 格式说明
 

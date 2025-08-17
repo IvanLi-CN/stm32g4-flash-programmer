@@ -279,10 +279,47 @@ async fn protocol_handler_loop<'a>(
                     }
                     Command::Erase => {
                         defmt::info!("Protocol: Processing Erase command");
-                        match flash_manager.erase_sector(packet.address).await {
-                            Ok(()) => Response::new(Status::Success, Vec::new()),
-                            Err(e) => {
-                                defmt::error!("Flash erase error: {:?}", e);
+
+                        // Extract size from packet data (4 bytes, little-endian)
+                        if packet.data.len() < 4 {
+                            defmt::error!("Erase command missing size data");
+                            Response::new(Status::InvalidAddress, Vec::new())
+                        } else {
+                            let size = u32::from_le_bytes([
+                                packet.data[0], packet.data[1], packet.data[2], packet.data[3]
+                            ]);
+
+                            defmt::info!("Erasing {} bytes starting at address 0x{:08X}", size, packet.address);
+
+                            // Calculate number of sectors to erase (4KB per sector)
+                            const SECTOR_SIZE: u32 = 4096;
+                            let start_sector = packet.address / SECTOR_SIZE;
+                            let end_address = packet.address + size;
+                            let end_sector = (end_address + SECTOR_SIZE - 1) / SECTOR_SIZE; // Round up
+                            let sectors_to_erase = end_sector - start_sector;
+
+                            defmt::info!("Erasing {} sectors (0x{:08X} to 0x{:08X})",
+                                sectors_to_erase, start_sector * SECTOR_SIZE, end_sector * SECTOR_SIZE);
+
+                            // Erase all required sectors
+                            let mut success = true;
+                            for sector in 0..sectors_to_erase {
+                                let sector_address = (start_sector + sector) * SECTOR_SIZE;
+                                match flash_manager.erase_sector(sector_address).await {
+                                    Ok(()) => {
+                                        defmt::info!("Erased sector at 0x{:08X}", sector_address);
+                                    }
+                                    Err(e) => {
+                                        defmt::error!("Flash erase error at 0x{:08X}: {:?}", sector_address, e);
+                                        success = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if success {
+                                Response::new(Status::Success, Vec::new())
+                            } else {
                                 Response::new(Status::FlashError, Vec::new())
                             }
                         }

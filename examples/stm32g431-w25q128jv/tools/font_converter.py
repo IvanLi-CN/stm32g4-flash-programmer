@@ -33,7 +33,7 @@ def convert_font_to_bitmap(font_path, output_dir, font_size=12):
 
         for start, end, name in char_ranges:
             print(f"Processing {name} range: 0x{start:04X} - 0x{end:04X}")
-            char_data = extract_character_range(font, start, end, name)
+            char_data = extract_character_range(font, font_path, font_size, start, end, name)
             all_char_data.extend(char_data)
             total_chars += len(char_data)
             print(f"  Extracted {len(char_data)} characters")
@@ -62,7 +62,7 @@ def convert_font_to_bitmap(font_path, output_dir, font_size=12):
         print(f"Error converting font: {e}")
         return False
 
-def extract_character_range(font, start_code, end_code, range_name):
+def extract_character_range(font, font_path, font_size, start_code, end_code, range_name):
     """Extract character bitmaps from a Unicode range"""
     char_data = []
 
@@ -111,18 +111,55 @@ def extract_character_range(font, start_code, end_code, range_name):
     return char_data
 
 def convert_to_bitmap(img):
-    """Convert PIL image to 1-bit bitmap data"""
+    """Convert PIL image to 1-bit bitmap data with improved thresholding"""
     width, height = img.size
     bitmap_data = bytearray()
     pixels = img.load()
 
+    # Calculate adaptive threshold using Otsu's method approximation
+    histogram = [0] * 256
+    total_pixels = width * height
+
+    # Build histogram
+    for y in range(height):
+        for x in range(width):
+            histogram[pixels[x, y]] += 1
+
+    # Find optimal threshold using variance-based method
+    sum_total = sum(i * histogram[i] for i in range(256))
+    sum_background = 0
+    weight_background = 0
+    weight_foreground = 0
+    variance_max = 0
+    threshold = 128  # default fallback
+
+    for t in range(256):
+        weight_background += histogram[t]
+        if weight_background == 0:
+            continue
+
+        weight_foreground = total_pixels - weight_background
+        if weight_foreground == 0:
+            break
+
+        sum_background += t * histogram[t]
+        mean_background = sum_background / weight_background
+        mean_foreground = (sum_total - sum_background) / weight_foreground
+
+        variance_between = weight_background * weight_foreground * (mean_background - mean_foreground) ** 2
+
+        if variance_between > variance_max:
+            variance_max = variance_between
+            threshold = t
+
+    # Convert to bitmap using adaptive threshold
     for y in range(height):
         byte_val = 0
         bit_count = 0
 
         for x in range(width):
-            # Convert grayscale to 1-bit (threshold at 128)
-            pixel = 1 if pixels[x, y] > 128 else 0
+            # Use adaptive threshold for better quality
+            pixel = 1 if pixels[x, y] > threshold else 0
             byte_val |= (pixel << (7 - bit_count))
             bit_count += 1
 
@@ -145,7 +182,7 @@ def generate_bitmap_file(char_data, output_path):
 
         # Calculate bitmap offsets
         header_size = 4  # Character count
-        char_info_size = len(char_data) * 8  # 8 bytes per character info
+        char_info_size = len(char_data) * 10  # 10 bytes per character info (changed from 8)
         bitmap_offset = header_size + char_info_size
 
         # Write character info table
@@ -153,7 +190,7 @@ def generate_bitmap_file(char_data, output_path):
             f.write(struct.pack('<I', char_info['char_code']))  # Unicode code point
             f.write(struct.pack('<B', char_info['width']))      # Width
             f.write(struct.pack('<B', char_info['height']))     # Height
-            f.write(struct.pack('<H', bitmap_offset))           # Bitmap offset
+            f.write(struct.pack('<I', bitmap_offset))           # Bitmap offset (changed to 32-bit)
             bitmap_offset += char_info['bitmap_size']
 
         # Write bitmap data
@@ -247,7 +284,9 @@ def main():
         return 1
 
     # Convert font to bitmap
-    if convert_font_to_bitmap(font_path, output_dir, font_size=12):
+    # 使用VonwaonBitmap-12px.ttf字体
+    vonwaon_font_path = "../assets/VonwaonBitmap-12px.ttf"
+    if convert_font_to_bitmap(vonwaon_font_path, output_dir, font_size=12):
         print("\n=== Font Conversion Complete ===")
         print("Bitmap font is ready for flash programming.")
         print("Use the address from memory_map.txt for programming.")

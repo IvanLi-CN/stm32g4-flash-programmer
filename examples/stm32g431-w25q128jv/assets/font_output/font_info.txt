@@ -42,24 +42,24 @@ Sample Characters (Sorted Order):
 =================================
 Char | Unicode | Size  | Bitmap Size
 -----|---------|-------|------------
- '!'  | U+0021  |  4x 8 |   8 bytes
- '"'  | U+0022  |  5x 9 |   9 bytes
- '#'  | U+0023  |  5x 8 |   8 bytes
- '$'  | U+0024  |  6x 8 |   8 bytes
- '%'  | U+0025  |  6x 8 |   8 bytes
- '&'  | U+0026  |  4x 7 |   7 bytes
- '''  | U+0027  |  4x 9 |   9 bytes
- '('  | U+0028  |  5x 9 |   9 bytes
- ')'  | U+0029  |  4x 9 |   9 bytes
- '*'  | U+002A  |  5x 6 |   6 bytes
- '+'  | U+002B  |  7x 6 |   6 bytes
- ','  | U+002C  |  5x 3 |   3 bytes
- '-'  | U+002D  |  5x 4 |   4 bytes
- '.'  | U+002E  |  4x 2 |   2 bytes
- '/'  | U+002F  |  4x10 |  10 bytes
- '0'  | U+0030  |  5x 7 |   7 bytes
- '1'  | U+0031  |  5x 7 |   7 bytes
- '2'  | U+0032  |  6x 7 |   7 bytes
- '3'  | U+0033  |  6x 7 |   7 bytes
- '4'  | U+0034  |  5x 7 |   7 bytes
+ '!'  | U+0021  |  8x 9 |   9 bytes
+ '"'  | U+0022  |  8x 9 |   9 bytes
+ '#'  | U+0023  |  8x 9 |   9 bytes
+ '$'  | U+0024  |  8x 9 |   9 bytes
+ '%'  | U+0025  |  8x 9 |   9 bytes
+ '&'  | U+0026  |  8x 7 |   7 bytes
+ '''  | U+0027  |  8x 9 |   9 bytes
+ '('  | U+0028  |  8x10 |  10 bytes
+ ')'  | U+0029  |  8x10 |  10 bytes
+ '*'  | U+002A  |  8x 9 |   9 bytes
+ '+'  | U+002B  |  8x 8 |   8 bytes
+ ','  | U+002C  |  8x 4 |   4 bytes
+ '-'  | U+002D  |  8x 5 |   5 bytes
+ '.'  | U+002E  |  8x 3 |   3 bytes
+ '/'  | U+002F  |  8x 9 |   9 bytes
+ '0'  | U+0030  |  8x 9 |   9 bytes
+ '1'  | U+0031  |  8x 9 |   9 bytes
+ '2'  | U+0032  |  8x 9 |   9 bytes
+ '3'  | U+0033  |  8x 9 |   9 bytes
+ '4'  | U+0034  |  8x 9 |   9 bytes
 ... and 2074 more characters

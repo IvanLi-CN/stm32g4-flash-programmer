@@ -293,29 +293,31 @@ impl DisplayManager {
     }
 
     /// Binary search for character info in the sorted character table
+    /// Updated to use 10-byte format: unicode(4) + width(1) + height(1) + bitmap_offset(4)
     async fn find_char_info(flash_manager: &mut crate::hardware::flash::FlashManager, char_info_base: u32, char_count: u32, target_unicode: u32) -> Result<FontCharInfo, &'static str> {
         let mut left = 0u32;
         let mut right = char_count - 1;
 
         while left <= right {
             let mid = (left + right) / 2;
-            let char_info_address = char_info_base + mid * 8; // 8 bytes per character info
+            let char_info_address = char_info_base + mid * 10; // 10 bytes per character info (new format)
 
-            // Read character info (8 bytes)
-            let char_info_data = match flash_manager.read_data_simple(char_info_address, 8).await {
+            // Read character info (10 bytes)
+            let char_info_data = match flash_manager.read_data_simple(char_info_address, 10).await {
                 Ok(data) => data,
                 Err(_) => return Err("Failed to read character info"),
             };
 
-            if char_info_data.len() != 8 {
+            if char_info_data.len() != 10 {
                 return Err("Invalid character info size");
             }
 
-            // Parse character info
+            // Parse character info (new 10-byte format)
             let unicode = u32::from_le_bytes([char_info_data[0], char_info_data[1], char_info_data[2], char_info_data[3]]);
             let width = char_info_data[4];
             let height = char_info_data[5];
-            let bitmap_offset = u16::from_le_bytes([char_info_data[6], char_info_data[7]]);
+            // 32-bit bitmap offset (4 bytes)
+            let bitmap_offset = u32::from_le_bytes([char_info_data[6], char_info_data[7], char_info_data[8], char_info_data[9]]) as u16;
 
             if unicode == target_unicode {
                 return Ok(FontCharInfo {
@@ -502,6 +504,10 @@ impl DisplayManager {
         if let Some(ref mut display) = self.display {
             let mut current_x = x;
 
+            // Define baseline height for vertical alignment
+            // Using a common baseline height (e.g., 14px for typical characters)
+            const BASELINE_HEIGHT: i32 = 14;
+
             for ch in text.chars() {
                 // MUST use Flash font - no embedded fonts allowed!
                 defmt::debug!("Reading character '{}' from Flash", ch);
@@ -509,20 +515,26 @@ impl DisplayManager {
                 // Try to read from Flash using correct font format
                 match Self::get_char_bitmap_from_flash(ch, flash_manager).await {
                     Ok((bitmap_vec, width, height)) => {
-                        defmt::debug!("Successfully read '{}' from Flash ({}x{})", ch, width, height);
+                        // Calculate vertical offset to align characters to baseline
+                        // Characters are aligned so their bottom edge sits on the baseline
+                        let y_offset = BASELINE_HEIGHT - height as i32;
+                        let char_y = y + y_offset;
+
+                        defmt::debug!("Successfully read '{}' from Flash ({}x{}) at ({}, {}) with y_offset={}", ch, width, height, current_x, char_y, y_offset);
                         // Convert Vec to array for compatibility
                         let mut bitmap_array = [0u8; 32];
                         let copy_len = bitmap_vec.len().min(32);
                         for i in 0..copy_len {
                             bitmap_array[i] = bitmap_vec[i];
                         }
-                        Self::draw_char_bitmap_simple_flash(display, current_x, y, &bitmap_array, width, height, color).await?;
+                        Self::draw_char_bitmap_simple_flash(display, current_x, char_y, &bitmap_array, width, height, color).await?;
                         current_x += width as i32 + 1;
                     },
                     Err(e) => {
                         defmt::error!("Failed to read '{}' from Flash: {}", ch, e);
-                        // Draw a placeholder rectangle instead of crashing
-                        display.fill_rect(current_x as u16, y as u16, 8, 8, Rgb565::RED).await.map_err(|_| "Failed to draw error placeholder")?;
+                        // Draw a placeholder rectangle at baseline-aligned position
+                        let placeholder_y = y + BASELINE_HEIGHT - 8;
+                        display.fill_rect(current_x as u16, placeholder_y as u16, 8, 8, Rgb565::RED).await.map_err(|_| "Failed to draw error placeholder")?;
                         current_x += 9;
                     }
                 }
@@ -574,6 +586,7 @@ impl DisplayManager {
 
 
     /// Draw character bitmap from Flash data (memory-safe version using pixel-by-pixel)
+    /// Using MSB first, row-major format (Method 1) - standard font bitmap format
     async fn draw_char_bitmap_simple_flash(
         display: &mut DisplayType,
         x: i32,
@@ -587,15 +600,15 @@ impl DisplayManager {
         let bytes_per_row = ((width as usize) + 7) / 8; // Round up to nearest byte
 
         for row in 0..height {
-            let row_start = (row as usize) * bytes_per_row;
-
             for col in 0..width {
-                let byte_index = row_start + (col as usize) / 8;
-                let bit_index = (col as usize) % 8; // LSB first - try different bit order
+                let byte_index = (row as usize) * bytes_per_row + (col as usize) / 8;
+                let bit_index = 7 - ((col as usize) % 8); // MSB first - matching web-app exactly
 
                 if byte_index < bitmap.len() {
                     let byte = bitmap[byte_index];
-                    if (byte & (1 << bit_index)) != 0 {
+                    let pixel = (byte >> bit_index) & 1; // Extract pixel using shift (web-app style)
+
+                    if pixel != 0 {
                         let pixel_x = x + col as i32;
                         let pixel_y = y + row as i32;
 
@@ -607,7 +620,7 @@ impl DisplayManager {
             }
         }
 
-        defmt::debug!("Drew character bitmap at ({}, {}) size {}x{} using pixel-by-pixel", x, y, width, height);
+        defmt::debug!("Drew character bitmap at ({}, {}) size {}x{} using MSB-first pixel-by-pixel", x, y, width, height);
         Ok(())
     }
 
@@ -790,12 +803,20 @@ impl DisplayManager {
         if let Some(ref mut display) = self.display {
             let mut current_x = x;
 
+            // Define baseline height for vertical alignment (same as Flash font)
+            const BASELINE_HEIGHT: i32 = 14;
+            const HARDCODED_CHAR_HEIGHT: i32 = 8;
+
             for ch in text.chars() {
                 let (bitmap, width) = Self::get_hardcoded_char_bitmap(ch);
 
+                // Calculate vertical offset to align characters to baseline
+                let y_offset = BASELINE_HEIGHT - HARDCODED_CHAR_HEIGHT;
+                let char_y = y + y_offset;
+
                 // Debug: Print hardcoded bitmap data for comparison
-                defmt::debug!("Hardcoded '{}' bitmap ({}x8): {:02X} {:02X} {:02X} {:02X}",
-                             ch, width, bitmap[0], bitmap[1], bitmap[2], bitmap[3]);
+                defmt::debug!("Hardcoded '{}' bitmap ({}x8) at ({}, {}) with y_offset={}: {:02X} {:02X} {:02X} {:02X}",
+                             ch, width, current_x, char_y, y_offset, bitmap[0], bitmap[1], bitmap[2], bitmap[3]);
 
                 // Draw character using pixel-by-pixel approach
                 for row in 0..8 {
@@ -803,7 +824,7 @@ impl DisplayManager {
                     for col in 0..width {
                         if (byte & (1 << (7 - col))) != 0 {
                             let pixel_x = current_x + col as i32;
-                            let pixel_y = y + row as i32;
+                            let pixel_y = char_y + row as i32;
 
                             display.fill_rect(pixel_x as u16, pixel_y as u16, 1, 1, color)
                                 .await.map_err(|_| "Failed to draw pixel")?;

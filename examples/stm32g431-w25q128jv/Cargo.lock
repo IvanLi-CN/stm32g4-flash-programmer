@@ -690,7 +690,7 @@ dependencies = [
 [[package]]
 name = "gc9307-async"
 version = "0.1.1"
-source = "git+https://github.com/IvanLi-CN/gc9307-async#d5284014bea8ad4a18a11e8c55c602ca35e81d61"
+source = "git+https://github.com/IvanLi-CN/gc9307-async#79bb81fc04d9c3c135cda7aaaf154ca86d0f7abf"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",

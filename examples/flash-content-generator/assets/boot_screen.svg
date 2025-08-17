@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="320" height="172" viewBox="0 0 320 172" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Circuit pattern -->
+    <pattern id="circuitPattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="none"/>
+      <circle cx="20" cy="20" r="2" fill="#60a5fa" opacity="0.3"/>
+      <line x1="0" y1="20" x2="40" y2="20" stroke="#60a5fa" stroke-width="1" opacity="0.2"/>
+      <line x1="20" y1="0" x2="20" y2="40" stroke="#60a5fa" stroke-width="1" opacity="0.2"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="320" height="172" fill="url(#bgGradient)"/>
+  
+  <!-- Circuit pattern overlay -->
+  <rect width="320" height="172" fill="url(#circuitPattern)"/>
+  
+  <!-- Main logo/icon area -->
+  <g transform="translate(160, 50)">
+    <!-- Microcontroller chip icon -->
+    <rect x="-25" y="-20" width="50" height="40" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+    
+    <!-- Chip pins -->
+    <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+      <!-- Left pins -->
+      <line x1="-25" y1="-15" x2="-30" y2="-15"/>
+      <line x1="-25" y1="-5" x2="-30" y2="-5"/>
+      <line x1="-25" y1="5" x2="-30" y2="5"/>
+      <line x1="-25" y1="15" x2="-30" y2="15"/>
+      
+      <!-- Right pins -->
+      <line x1="25" y1="-15" x2="30" y2="-15"/>
+      <line x1="25" y1="-5" x2="30" y2="-5"/>
+      <line x1="25" y1="5" x2="30" y2="5"/>
+      <line x1="25" y1="15" x2="30" y2="15"/>
+      
+      <!-- Top pins -->
+      <line x1="-15" y1="-20" x2="-15" y2="-25"/>
+      <line x1="-5" y1="-20" x2="-5" y2="-25"/>
+      <line x1="5" y1="-20" x2="5" y2="-25"/>
+      <line x1="15" y1="-20" x2="15" y2="-25"/>
+      
+      <!-- Bottom pins -->
+      <line x1="-15" y1="20" x2="-15" y2="25"/>
+      <line x1="-5" y1="20" x2="-5" y2="25"/>
+      <line x1="5" y1="20" x2="5" y2="25"/>
+      <line x1="15" y1="20" x2="15" y2="25"/>
+    </g>
+    
+    <!-- Chip label -->
+    <text x="0" y="0" text-anchor="middle" dominant-baseline="central" 
+          font-family="Arial, sans-serif" font-size="8" fill="#1e40af" font-weight="bold">STM32</text>
+  </g>
+  
+  <!-- Flash memory icon -->
+  <g transform="translate(80, 120)">
+    <rect x="-15" y="-8" width="30" height="16" rx="2" fill="#fbbf24" stroke="#f59e0b" stroke-width="1"/>
+    <text x="0" y="0" text-anchor="middle" dominant-baseline="central" 
+          font-family="Arial, sans-serif" font-size="6" fill="#92400e" font-weight="bold">FLASH</text>
+  </g>
+  
+  <!-- Connection lines -->
+  <g stroke="#60a5fa" stroke-width="2" fill="none" opacity="0.8">
+    <path d="M 135 60 Q 110 80 95 112" stroke-dasharray="3,2"/>
+  </g>
+  
+  <!-- Title text -->
+  <text x="160" y="140" text-anchor="middle" 
+        font-family="Arial, sans-serif" font-size="16" fill="#f8fafc" font-weight="bold">
+    STM32G4 Flash Programmer
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="160" y="158" text-anchor="middle" 
+        font-family="Arial, sans-serif" font-size="10" fill="#cbd5e1">
+    W25Q128JV Resource Manager
+  </text>
+  
+  <!-- Status indicator -->
+  <g transform="translate(280, 30)">
+    <circle cx="0" cy="0" r="6" fill="#10b981"/>
+    <circle cx="0" cy="0" r="3" fill="#34d399" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- Version info -->
+  <text x="10" y="165" font-family="Arial, sans-serif" font-size="8" fill="#94a3b8">v1.0</text>
+</svg>

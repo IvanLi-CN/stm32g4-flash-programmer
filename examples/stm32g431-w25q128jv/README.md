@@ -1,345 +1,91 @@
-# Flash Content Viewer
+# STM32G431 Flash Content Viewer
 
-基于 STM32G431CBU6 的 W25Q128JV Flash 内容显示器固件，能够在 GC9307 TFT 显示屏上显示外部 Flash 中存储的资源内容。
+STM32G431CBU6-based W25Q128JV Flash content viewer firmware that can display fonts and image resources stored in external Flash on an ST7789 TFT display.
 
-## 🎯 功能特性
+## 🎯 Features
 
-- **双 SPI 总线管理**：SPI1 连接 GC9307 显示屏，SPI2 连接 W25Q128JV Flash
-- **交互式资源浏览器**：通过按钮控制的图形界面浏览 Flash 资源
-- **多种显示模式**：
-  - 资源列表视图：显示所有可用的资源区域
-  - 资源详情视图：显示选中资源的详细信息和数据预览
-  - 十六进制转储：显示原始数据的十六进制格式
-- **智能缓存系统**：LRU 缓存机制提高数据读取性能
-- **完整的资源解析**：支持字体位图、RGB565 图片等格式
+- **Flash Font Rendering**: Read font bitmaps from external Flash and display text on screen
+- **Vertical Baseline Alignment**: All characters aligned on the same horizontal baseline
+- **Dual SPI Bus Management**: SPI1 connects to ST7789 display, SPI2 connects to W25Q128JV Flash
+- **Interactive Interface**: Graphical interface controlled by buttons
+- **Flash Communication Verification**: Display Flash chip information and connection status
 
-## 🔌 硬件配置
+## 🔌 Hardware Configuration
 
-### STM32G431CBU6 引脚分配
+### STM32G431CBU6 Pin Assignment
 
-| 功能 | 引脚 | SPI总线 | 用途 |
-|------|------|---------|------|
+| Function | Pin | SPI Bus | Purpose |
+|----------|-----|---------|---------|
 | **W25Q128JV Flash** | | **SPI2** | |
-| SCK | PB13 | SPI2 | 时钟 |
-| MOSI | PB15 | SPI2 | 主出从入 |
-| MISO | PB14 | SPI2 | 主入从出 |
-| CS | PB12 | - | 片选 |
-| WP# | PB11 | - | 写保护 |
-| HOLD# | PA10 | - | 保持 |
-| **GC9307 显示屏** | | **SPI1** | |
-| SCK | PB3 | SPI1 | 时钟 |
-| MOSI | PB5 | SPI1 | 数据 |
-| CS | PA15 | - | 片选 |
-| DC | PC14 | - | 数据/命令 |
-| RST | PC15 | - | 复位 |
-| **用户交互** | | | |
-| 按钮1 | PC10 | - | 上一项/返回 |
-| 按钮3 | PC13 | - | 下一项/选择 |
+| SCK | PB13 | SPI2 | Clock |
+| MOSI | PB15 | SPI2 | Master Out Slave In |
+| MISO | PB14 | SPI2 | Master In Slave Out |
+| CS | PB12 | - | Chip Select |
+| **ST7789 Display** | | **SPI1** | |
+| SCK | PB3 | SPI1 | Clock |
+| MOSI | PB5 | SPI1 | Data |
+| CS | PA15 | - | Chip Select |
+| DC | PC14 | - | Data/Command |
+| RST | PC15 | - | Reset |
+| **User Interaction** | | | |
+| Button1 | PC10 | - | Function Button 1 |
+| Button3 | PC13 | - | Function Button 3 |
 
-## 🚀 构建和使用
+## 🚀 Build and Usage
 
-### 构建固件
+### Prerequisites
+
+1. **Flash Content Preparation**: Use tools in `../flash-content-generator/` to generate font bitmap files
+2. **Flash Programming**: Program the generated font files to W25Q128JV Flash at address 0x20000
+
+### Build Firmware
 
 ```bash
-# 检查代码
-cargo check
-
-# 构建 Debug 版本
-cargo build
-
-# 构建 Release 版本
+# Build Release version
 cargo build --release
 
-# 或使用提供的脚本
-./build.sh
+# Flash to STM32
+cargo flash --release --chip STM32G431CBUx
 ```
 
-### 烧录固件
+### Runtime Effects
 
-```bash
-# 使用 probe-rs 烧录
-probe-rs run --chip STM32G431CBU6 target/thumbv7em-none-eabihf/release/flash-content-viewer
+1. **Startup**: Firmware displays Flash chip information after startup
+2. **Font Testing**: Display font characters read from Flash
+3. **Button Labels**: Display "BTN1" and "BTN3" labels on screen
+4. **Baseline Alignment**: All text aligned on the same horizontal line
 
-# 或使用 st-flash
-st-flash write target/thumbv7em-none-eabihf/release/flash-content-viewer.bin 0x8000000
-```
+## 📁 Project Structure
 
-### 用户操作
-
-1. **启动**：固件启动后显示欢迎界面和 Flash 状态
-2. **浏览资源**：
-   - 按钮1 (PC10)：向上导航/上一项
-   - 按钮3 (PC13)：向下导航/选择项目
-3. **查看详情**：在资源列表中按按钮3进入详情视图
-4. **返回列表**：在详情视图中按按钮3返回列表
-
-## 📁 项目结构
-
-```
+```text
 src/
-├── main.rs              # 主程序入口和应用逻辑
-├── hardware/            # 硬件抽象层
-│   ├── flash.rs         # Flash 管理器
-│   ├── display.rs       # 显示管理器
-│   └── spi_bus.rs       # SPI 总线工具
-├── resources/           # 资源管理系统
-│   ├── layout.rs        # 内存布局定义
-│   ├── font_parser.rs   # 字体解析器
-│   ├── image_parser.rs  # 图片解析器
-│   └── cache.rs         # 缓存系统
-└── ui/                  # 用户界面组件
-    ├── app.rs           # 应用框架
-    ├── font_viewer.rs   # 字体查看器
-    └── image_viewer.rs  # 图片查看器
+├── main.rs              # Main program entry and application logic
+├── hardware/            # Hardware abstraction layer
+│   ├── flash.rs         # Flash manager
+│   └── display.rs       # Display manager
+├── resources/           # Resource management system
+│   ├── layout.rs        # Memory layout definitions
+│   ├── font_parser.rs   # Font parser
+│   ├── image_parser.rs  # Image parser
+│   └── cache.rs         # Cache system
+└── ui/                  # User interface components
+    └── app.rs           # Application framework
 ```
 
-## 🔧 技术特点
+## 🔧 Technical Features
 
-- **异步架构**：基于 Embassy 框架的异步编程
-- **内存高效**：8KB 堆内存，智能缓存管理
-- **模块化设计**：清晰的硬件抽象和资源管理分层
-- **错误处理**：完善的错误处理和状态反馈
-- **可扩展性**：预留接口支持更多资源类型和显示功能
+- **Async Architecture**: Asynchronous programming based on Embassy framework
+- **Flash Font Rendering**: Read font bitmaps from external Flash and render to screen
+- **Vertical Baseline Alignment**: Implement character vertical baseline alignment for neat text display
+- **Modular Design**: Clear hardware abstraction and resource management layering
+- **Error Handling**: Comprehensive error handling and status feedback
 
-## 📝 开发说明
+## 📝 Flash Content Generation
 
-当前版本为基础框架实现，包含：
+Flash content (font bitmaps, etc.) needs to be generated using tools in `../flash-content-generator/`.
 
-- ✅ 完整的项目结构和编译系统
-- ✅ 硬件初始化和 SPI 总线管理
-- ✅ 基础的用户界面和交互逻辑
-- ✅ 资源布局定义和解析框架
-- 🔄 简化的显示和 Flash 操作（用于演示）
+For detailed instructions, see: [Flash Content Generator](../flash-content-generator/README.md)
 
-未来可扩展功能：
+## License
 
-- 真实的 GC9307 显示驱动集成
-- 完整的 W25Q128JV Flash 读取功能
-- 字体和图片的实际渲染显示
-- 更丰富的用户界面和交互
-
----
-
-# 原始资源库方案文档
-
-以下是原始的 W25Q128JV 资源库方案，包含完整的资源管理和工具集：
-
-## Flash 存储器规格
-
-- **型号**: W25Q128JV
-- **容量**: 16MB (128Mbit)
-- **扇区大小**: 4KB (最小擦除单位)
-- **页大小**: 256 字节 (编程单位)
-- **块大小**: 64KB (快速擦除单位)
-- **地址范围**: 0x000000 - 0xFFFFFF
-
-## 内存布局规划
-
-| 资源名称 | 起始地址 | 大小 | 结束地址 | 扇区范围 | 描述 |
-|---------|---------|------|---------|---------|------|
-| boot_screen | 0x000000 | 110,080 字节 | 0x0001ADFF | 0-26 | 320x172 RGB565 开机屏幕 |
-| font_bitmap | 0x00020000 | 2,097,152 字节 | 0x0021FFFF | 32-543 | 文泉驿 12px 位图字体 (2094字符) |
-| ui_graphics | 0x00220000 | 2,097,152 字节 | 0x0041FFFF | 544-1055 | UI 图形和图标 (2MB) |
-| app_data | 0x00420000 | 3,145,728 字节 | 0x0071FFFF | 1056-1823 | 应用程序数据存储 (3MB) |
-| user_config | 0x00720000 | 65,536 字节 | 0x0072FFFF | 1824-1839 | 用户配置和设置 (64KB) |
-| log_storage | 0x00730000 | 131,072 字节 | 0x0074FFFF | 1840-1871 | 系统和错误日志 (128KB) |
-| firmware_update | 0x00750000 | 524,288 字节 | 0x007CFFFF | 1872-1999 | 固件更新存储 (512KB) |
-| reserved | 0x007D0000 | 8,585,216 字节 | 0x00FFFFFF | 2000-4095 | 预留区域 (8.2MB) |
-
-## 资源文件
-
-### 字体资源
-
-- **原始文件**: `assets/WenQuanYi.Bitmap.Song.12px.ttf` (6.1MB)
-- **转换后**: `assets/font_output/font_bitmap.bin` (52KB)
-- **字符数量**: 2094 个字符
-- **格式**: 1位单色位图，12px 字体
-- **编码**: Unicode (UTF-16)
-
-#### 字符编码范围
-
-| 范围名称 | Unicode 范围 | 字符数 | 描述 |
-|---------|-------------|--------|------|
-| **ASCII** | U+0021 - U+007E | 94 | 基本 ASCII 字符 (!"#$...~) |
-| **CJK 统一汉字** | U+4E00 - U+51E7 | 1000 | 中文常用汉字 |
-| **CJK 扩展 A** | U+3400 - U+37E7 | 1000 | 中文扩展汉字 |
-
-#### 包含的字符类型
-
-- **标点符号**: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
-- **数字**: 0123456789
-- **英文字母**: A-Z, a-z
-- **中文汉字**: 包含最常用的 2000 个汉字
-- **特殊字符**: 空格及其他可打印 ASCII 字符
-
-### 图片资源
-- **开机屏幕**: `assets/boot_screen_320x172.bin`
-  - 尺寸: 320x172 像素
-  - 格式: RGB565 (16位色彩)
-  - 大小: 110,080 字节
-  - 设计: STM32G4 Flash 编程器启动画面
-
-### 生成的配置文件
-- **内存映射文档**: `assets/memory_map.txt`
-- **资源布局表**: `assets/resource_layout.json`
-
-## 工具集
-
-### 1. 开机屏幕生成器
-```bash
-cd tools
-python3 svg_to_rgb565.py
-```
-- 生成 320x172 RGB565 格式的开机屏幕
-- 包含 STM32 芯片图标和连接线
-- 蓝色渐变背景和电路图案
-
-### 2. 字体位图转换器
-```bash
-cd tools
-python3 font_converter.py
-```
-- 将 TTF 字体转换为 1位位图格式
-- 提取 ASCII + 中文常用字符 (2094个字符)
-- 生成 52KB 位图字体文件
-
-### 3. 资源管理器
-```bash
-cd tools
-python3 resource_manager.py
-```
-- 生成完整的内存布局规划
-- 创建 C 头文件定义
-- 输出 JSON 格式的资源表
-
-## 格式说明
-
-### RGB565 格式
-
-RGB565 是一种 16 位色彩格式：
-- **R**: 5 位红色 (位 15-11)
-- **G**: 6 位绿色 (位 10-5)
-- **B**: 5 位蓝色 (位 4-0)
-- **字节序**: 小端序存储
-- **色彩数**: 65,536 种颜色
-
-### 位图字体格式
-
-位图字体采用自定义二进制格式：
-
-#### 文件结构
-```
-+------------------+
-| 头部 (4 字节)     |  字符数量 (uint32_t, 小端序)
-+------------------+
-| 字符信息表        |  每个字符 8 字节
-| (8 * N 字节)     |  - Unicode 码点 (uint32_t)
-|                  |  - 宽度 (uint8_t)
-|                  |  - 高度 (uint8_t)
-|                  |  - 位图偏移 (uint16_t)
-+------------------+
-| 位图数据          |  1位单色位图数据
-| (变长)           |  - 每字节 8 像素
-|                  |  - 行优先顺序
-+------------------+
-```
-
-#### 字符查找方法
-1. 读取头部获取字符总数
-2. 在字符信息表中查找目标 Unicode 码点
-3. 根据偏移量读取对应的位图数据
-4. 按宽度和高度解析位图像素
-
-#### 支持的字符示例
-- **英文**: Hello World!
-- **数字**: 0123456789
-- **符号**: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
-- **中文**: 你好世界，这是测试文本。
-
-## 扩展功能
-
-### 字体编码范围扩展
-
-当前字体包含 2094 个字符，可根据需要扩展：
-
-#### 当前支持的范围
-- **ASCII**: U+0021-U+007E (94 字符)
-- **CJK 统一汉字**: U+4E00-U+51E7 (1000 字符)
-- **CJK 扩展 A**: U+3400-U+37E7 (1000 字符)
-
-#### 可扩展的范围
-- **更多常用汉字**: U+4E00-U+9FFF (20,992 字符)
-- **标点符号**: U+3000-U+303F (中文标点)
-- **假名**: U+3040-U+309F (平假名), U+30A0-U+30FF (片假名)
-- **数字符号**: U+2460-U+24FF (圆圈数字等)
-
-#### 扩展方法
-1. 修改 `font_converter.py` 中的 `char_ranges` 变量
-2. 调整字体存储区域大小 (当前分配 2MB)
-3. 重新运行字体转换工具
-
-#### 注意事项
-- 字符数量增加会显著增大位图文件
-- 建议根据实际需求选择字符范围
-- 可使用字符频率统计优化字符选择
-
-### UI 图标库
-
-`ui_graphics` 区域 (512KB) 可存储：
-
-- 按钮图标
-- 状态指示器
-- 进度条素材
-- 菜单图标
-
-### 动态资源管理
-
-实现运行时资源管理：
-
-- 资源索引表
-- 动态加载机制
-- 缓存管理
-- 压缩存储
-
-## 性能优化
-
-### 读取优化
-- 按页对齐读取 (256 字节)
-- 批量读取减少 SPI 开销
-- 缓存常用资源
-
-### 存储优化
-- 资源压缩 (RLE、LZ77)
-- 字体子集化
-- 图片优化
-
-## 注意事项
-
-1. **扇区对齐**: 大资源应按 4KB 扇区对齐
-2. **擦除策略**: 更新资源前需要擦除整个扇区
-3. **磨损均衡**: 频繁更新的数据应分散存储
-4. **备份机制**: 关键配置数据应有备份区域
-
-## 文件结构
-
-```
-examples/w25q128jv/
-├── README.md                           # 本文档
-├── assets/                             # 资源文件
-│   ├── WenQuanYi.Bitmap.Song.12px.ttf # 原始字体文件 (6.1MB)
-│   ├── boot_screen.svg                 # 开机屏幕 SVG 源文件
-│   ├── boot_screen_320x172.bin         # RGB565 开机屏幕位图 (108KB)
-│   ├── memory_map.txt                  # 内存映射文档
-│   ├── resource_layout.json            # 资源布局表 (JSON)
-│   └── font_output/                    # 字体转换输出
-│       ├── font_info.txt               # 字体信息文档
-│       └── font_bitmap.bin             # 位图字体数据 (52KB, 2094字符)
-└── tools/                              # 工具集
-    ├── svg_to_rgb565.py               # 开机屏幕生成器
-    ├── font_converter.py              # 字体位图转换器
-    └── resource_manager.py            # 资源管理器
-```
-
-## 许可证
-
-本项目遵循 MIT 许可证。字体文件 WenQuanYi.Bitmap.Song.12px.ttf 遵循其原始许可证。
+This project is licensed under the MIT License.

@@ -178,6 +178,31 @@ This project has been thoroughly tested and verified:
 - ✅ Data verification working
 - ✅ All test cases passing
 
+## 📁 Project Structure
+
+```text
+stm32g4-flash-programmer/
+├── src/                           # Core firmware source
+│   ├── main.rs                   # Main application entry
+│   ├── usb_handler.rs            # USB CDC communication
+│   ├── flash_ops.rs              # Flash operations (read/write/erase)
+│   ├── protocol.rs               # Communication protocol
+│   └── hardware.rs               # Hardware abstraction
+├── protocol/                     # Shared protocol definitions
+├── host-tools/                   # PC-side utilities
+│   ├── flash-programmer/         # Main CLI tool
+│   └── examples/                 # Usage examples
+├── examples/                     # Example projects and tools
+│   ├── stm32g431-w25q128jv/      # STM32G431 Flash content viewer
+│   └── flash-content-generator/  # Tools for generating Flash content
+└── docs/                         # Documentation
+```
+
+### Examples Directory
+
+- **`examples/stm32g431-w25q128jv/`**: Complete STM32G431 firmware example that reads font bitmaps from external Flash and displays them on an ST7789 TFT screen with vertical baseline alignment
+- **`examples/flash-content-generator/`**: Python tools and web applications for generating Flash content including fonts, images, and resource layouts
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

@@ -269,30 +269,9 @@ impl<'a> FlashCommands<'a> {
             tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
 
-        // Send one final regular Write command to confirm completion with extended timeout
+        // Give extra time for Flash controller to complete all pending writes
         if written > 0 {
-            // Give extra time for the final confirmation after high-speed burst
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-            let final_packet = Packet::new_with_sequence(Command::Write, address + written as u32 - 1, vec![0], sequence);
-
-            // Try confirmation with retry logic for robustness
-            let mut retries = 3;
-            while retries > 0 {
-                match self.connection.send_command(final_packet.clone()).await {
-                    Ok(_) => break,
-                    Err(_e) if retries > 1 => {
-                        retries -= 1;
-                        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-                        continue;
-                    }
-                    Err(_e) => {
-                        // If final confirmation fails but all data was sent, consider it a success
-                        eprintln!("Warning: Final confirmation failed, but {} bytes were successfully transmitted", written);
-                        break;
-                    }
-                }
-            }
         }
 
         Ok(())

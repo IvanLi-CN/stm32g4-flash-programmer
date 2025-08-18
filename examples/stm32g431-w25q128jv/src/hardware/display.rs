@@ -7,7 +7,7 @@ use embassy_embedded_hal::shared_bus::asynch::spi::SpiDevice;
 use embedded_graphics::{pixelcolor::Rgb565, prelude::RgbColor};
 use gc9307_async::{Config as DisplayConfig, GC9307C, Orientation, Timer};
 use embassy_time;
-// Font-related imports removed - no fonts stored in firmware
+use crate::resources::{font_renderer_16px::FontRenderer16px, boot_screen_loader::{BootScreenLoader, DisplayTrait}};
 
 // Embassy timer implementation for gc9307-async
 struct EmbassyTimer;
@@ -38,6 +38,8 @@ pub struct DisplayManager {
     display: Option<DisplayType>,
     width: u16,
     height: u16,
+    font_renderer_16px: FontRenderer16px,
+    boot_screen_loader: BootScreenLoader,
 }
 
 impl DisplayManager {
@@ -47,6 +49,8 @@ impl DisplayManager {
             display: None,
             width: 320,  // GC9307 actual resolution for this project
             height: 172,
+            font_renderer_16px: FontRenderer16px::new(),
+            boot_screen_loader: BootScreenLoader::new(),
         }
     }
 
@@ -1077,5 +1081,176 @@ impl DisplayManager {
         Ok(())
     }
 
-    // Font test method removed - no fonts stored in firmware
+    /// Initialize 16px font renderer
+    pub async fn initialize_16px_font(&mut self, flash_manager: &mut crate::hardware::flash::FlashManager) -> Result<(), &'static str> {
+        defmt::info!("🎨 Initializing 16px font renderer...");
+        self.font_renderer_16px.initialize(flash_manager).await?;
+        defmt::info!("✅ 16px font renderer initialized successfully");
+        Ok(())
+    }
+
+    /// Draw text using 16px font
+    pub async fn draw_text_16px(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        color: Rgb565,
+        flash_manager: &mut crate::hardware::flash::FlashManager
+    ) -> Result<(), &'static str> {
+        if let Some(ref mut display) = self.display {
+            defmt::info!("🖋️ Drawing 16px text at ({}, {}): '{}'", x, y, text);
+
+            let mut current_x = x;
+            const BASELINE_HEIGHT: i32 = 16; // 16px字体的基线高度
+            const CHAR_SPACING: i32 = 1;     // 字符间距
+
+            for ch in text.chars() {
+                let char_code = ch as u32;
+
+                // 查找字符信息
+                match self.font_renderer_16px.find_char(char_code, flash_manager).await {
+                    Ok(char_info) => {
+                        // 读取字符位图
+                        match self.font_renderer_16px.read_char_bitmap(&char_info, flash_manager).await {
+                            Ok(bitmap) => {
+                                // 计算字符的垂直对齐位置
+                                let char_y = y + BASELINE_HEIGHT - char_info.height as i32;
+
+                                // 渲染字符位图
+                                Self::render_char_bitmap_16px(
+                                    display,
+                                    current_x,
+                                    char_y,
+                                    &bitmap,
+                                    char_info.width,
+                                    char_info.height,
+                                    color
+                                ).await?;
+
+                                current_x += char_info.width as i32 + CHAR_SPACING;
+
+                                defmt::debug!("✅ Rendered character '{}' (U+{:04X}) at ({}, {})",
+                                             ch, char_code, current_x - char_info.width as i32 - CHAR_SPACING, char_y);
+                            },
+                            Err(e) => {
+                                defmt::error!("❌ Failed to read bitmap for '{}': {}", ch, e);
+                                // 绘制占位符
+                                display.fill_rect(current_x as u16, y as u16, 8, 16, Rgb565::RED)
+                                    .await.map_err(|_| "Failed to draw placeholder")?;
+                                current_x += 8 + CHAR_SPACING;
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        defmt::warn!("⚠️ Character '{}' (U+{:04X}) not found: {}", ch, char_code, e);
+                        // 绘制占位符
+                        display.fill_rect(current_x as u16, y as u16, 8, 16, Rgb565::YELLOW)
+                            .await.map_err(|_| "Failed to draw placeholder")?;
+                        current_x += 8 + CHAR_SPACING;
+                    }
+                }
+            }
+
+            defmt::info!("✅ 16px text rendered successfully: '{}'", text);
+            Ok(())
+        } else {
+            Err("Display not initialized")
+        }
+    }
+
+    /// Render character bitmap for 16px font
+    async fn render_char_bitmap_16px(
+        display: &mut DisplayType,
+        x: i32,
+        y: i32,
+        bitmap: &[u8],
+        width: u8,
+        height: u8,
+        color: Rgb565
+    ) -> Result<(), &'static str> {
+        let bytes_per_row = ((width as usize) + 7) / 8;
+
+        for row in 0..height {
+            for col in 0..width {
+                let byte_index = (row as usize) * bytes_per_row + (col as usize) / 8;
+                let bit_index = 7 - ((col as usize) % 8); // MSB优先
+
+                if byte_index < bitmap.len() {
+                    let byte = bitmap[byte_index];
+                    let pixel = (byte >> bit_index) & 1;
+
+                    if pixel != 0 {
+                        let pixel_x = x + col as i32;
+                        let pixel_y = y + row as i32;
+
+                        // 绘制像素
+                        display.fill_rect(pixel_x as u16, pixel_y as u16, 1, 1, color)
+                            .await.map_err(|_| "Failed to draw pixel")?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Show boot screen
+    pub async fn show_boot_screen(&mut self, flash_manager: &mut crate::hardware::flash::FlashManager) -> Result<(), &'static str> {
+        defmt::info!("🔍 DEBUG: Entered show_boot_screen method");
+        defmt::info!("🖼️ Loading and displaying boot screen...");
+
+        defmt::info!("🔍 DEBUG: About to call verify_screen_data");
+        // 验证开屏图数据
+        self.boot_screen_loader.verify_screen_data(flash_manager).await?;
+        defmt::info!("🔍 DEBUG: verify_screen_data completed successfully");
+
+        // 获取开屏图信息
+        let screen_info = self.boot_screen_loader.get_screen_info();
+        defmt::info!("📊 Boot screen info: {}x{} pixels, {} bytes",
+                    screen_info.width, screen_info.height, screen_info.total_size);
+
+        if let Some(ref mut display) = self.display {
+            // 清空屏幕
+            display.fill_screen(Rgb565::BLACK).await.map_err(|_| "Failed to clear screen")?;
+
+            // 加载并显示开屏图
+            self.boot_screen_loader.load_and_display(display, flash_manager).await?;
+
+            defmt::info!("✅ Boot screen displayed successfully!");
+            Ok(())
+        } else {
+            Err("Display not initialized")
+        }
+    }
+
+    /// Get boot screen statistics
+    pub async fn get_boot_screen_stats(&mut self, flash_manager: &mut crate::hardware::flash::FlashManager) -> Result<(), &'static str> {
+        match self.boot_screen_loader.get_screen_stats(flash_manager).await {
+            Ok(stats) => {
+                defmt::info!("📊 Boot screen statistics:");
+                defmt::info!("   Size: {}x{} pixels ({} bytes)", stats.width, stats.height, stats.total_size);
+                defmt::info!("   Sampled: {} pixels", stats.sampled_pixels);
+                defmt::info!("   Average RGB: ({}, {}, {})", stats.avg_red, stats.avg_green, stats.avg_blue);
+                Ok(())
+            },
+            Err(e) => {
+                defmt::error!("❌ Failed to get boot screen stats: {}", e);
+                Err(e)
+            }
+        }
+    }
+}
+
+/// Implement DisplayTrait for our DisplayType to enable boot screen loading
+impl DisplayTrait for DisplayType {
+    type Error = &'static str;
+
+    async fn fill_screen(&mut self, color: Rgb565) -> Result<(), Self::Error> {
+        self.fill_screen(color).await.map_err(|_| "Failed to fill screen")
+    }
+
+    async fn fill_rect(&mut self, x: u16, y: u16, width: u16, height: u16, color: Rgb565) -> Result<(), Self::Error> {
+        self.fill_rect(x, y, width, height, color).await.map_err(|_| "Failed to fill rect")
+    }
 }

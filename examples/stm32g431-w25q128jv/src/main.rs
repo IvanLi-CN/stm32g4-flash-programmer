@@ -3,10 +3,9 @@
 
 use embassy_executor::Spawner;
 use embassy_stm32::{
-    bind_interrupts, peripherals,
+    bind_interrupts,
     spi::{self, Spi},
-    gpio::{Level, Output, Speed, Pull},
-    exti::ExtiInput,
+    gpio::{Level, Output, Speed},
     time::Hertz,
 };
 use embassy_sync::{
@@ -104,10 +103,6 @@ async fn main(_spawner: Spawner) {
     let _flash_wp = Output::new(p.PB11, Level::High, Speed::VeryHigh); // Write protect (HIGH = enabled)
     let _flash_hold = Output::new(p.PA10, Level::High, Speed::VeryHigh); // Hold (HIGH = normal operation)
 
-    // Button inputs
-    let btn1 = ExtiInput::new(p.PC10, p.EXTI10, Pull::Up); // BTN1 - active low
-    let btn3 = ExtiInput::new(p.PC13, p.EXTI13, Pull::Up); // BTN3 - active low
-
     defmt::info!("Hardware pins configured");
 
     // Initialize display
@@ -116,29 +111,17 @@ async fn main(_spawner: Spawner) {
         Ok(()) => {
             defmt::info!("✅ Display initialized successfully");
 
-            // Test sequence: 彩条 -> 棋盘 -> 文字
-            defmt::info!("🎨 Starting display validation sequence...");
+            // Step 1: Render checkerboard pattern first
+            defmt::info!("🎨 Step 1: Rendering checkerboard pattern...");
+            match display_manager.draw_checkerboard().await {
+                Ok(()) => defmt::info!("✅ Checkerboard pattern rendered successfully"),
+                Err(e) => defmt::error!("❌ Failed to render checkerboard: {}", e),
+            }
 
-            // Test 1: Color bars
-            defmt::info!("Test 1: Color bars");
-            display_manager.draw_color_bars().await.unwrap_or_else(|e| {
-                defmt::error!("Failed to draw color bars: {}", e);
-            });
+            // Wait to show checkerboard
             Timer::after(Duration::from_millis(2000)).await;
 
-            // Test 2: Checkerboard pattern
-            defmt::info!("Test 2: Checkerboard pattern");
-            let checkerboard_start = embassy_time::Instant::now();
-            display_manager.draw_checkerboard().await.unwrap_or_else(|e| {
-                defmt::error!("Failed to draw checkerboard: {}", e);
-            });
-            let checkerboard_time = embassy_time::Instant::now() - checkerboard_start;
-            defmt::info!("⏱️  Checkerboard render time: {}ms", checkerboard_time.as_millis());
-            Timer::after(Duration::from_millis(2000)).await;
-
-            defmt::info!("📊 Performance Summary:");
-            defmt::info!("   Checkerboard: {}ms (complex pattern)", checkerboard_time.as_millis());
-            defmt::info!("🚀 Display driver upgrade completed successfully!");
+            defmt::info!("🚀 Display driver ready for font and image rendering!");
         }
         Err(e) => {
             defmt::error!("❌ Display initialization failed: {}", e);
@@ -176,6 +159,19 @@ async fn main(_spawner: Spawner) {
                 }
             }
 
+            // Initialize 16px font renderer
+            defmt::info!("=== Initializing 16px Font System ===");
+            match display_manager.initialize_16px_font(&mut flash_manager).await {
+                Ok(()) => {
+                    defmt::info!("✅ 16px font system initialized successfully");
+                },
+                Err(e) => {
+                    defmt::error!("❌ Failed to initialize 16px font: {}", e);
+                }
+            }
+
+            // Skip boot screen for now - will show at the end
+
             // First, let's explore what's actually in Flash
             defmt::info!("=== Flash Content Exploration ===");
 
@@ -212,39 +208,48 @@ async fn main(_spawner: Spawner) {
             // Skip font data generation - no fonts stored in firmware
             defmt::info!("Skipping font data generation (no fonts in firmware)");
 
-            // Show unified text interface
-            if let Ok(_info) = flash_manager.get_flash_info().await {
-                display_manager.clear(Rgb565::BLACK).await.unwrap_or_default();
+            // Show new 16px font interface
+            // Always show the interface since Flash is initialized
+            display_manager.clear(Rgb565::BLACK).await.unwrap_or_default();
 
-                // Title
-                display_manager.draw_text("Flash Content Viewer", 50, 20, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
+            defmt::info!("=== Testing 16px Font Rendering ===");
 
-                // Flash info
-                display_manager.draw_text("JEDEC: EF4018", 20, 50, Rgb565::CYAN, &mut flash_manager).await.unwrap_or_default();
-                display_manager.draw_text("Size: 16MB", 20, 70, Rgb565::GREEN, &mut flash_manager).await.unwrap_or_default();
-
-                // Chinese character test
-                display_manager.draw_text("中文显示", 20, 100, Rgb565::MAGENTA, &mut flash_manager).await.unwrap_or_default();
-
-                // Status
-                display_manager.draw_text("Ready!", 20, 130, Rgb565::YELLOW, &mut flash_manager).await.unwrap_or_default();
-
-                // Test hardcoded font
-                defmt::info!("Testing hardcoded font rendering...");
-                display_manager.draw_text_hardcoded(20, 160, "HELLO", Rgb565::RED).await.unwrap_or_default();
-
-                // First verify the bitmap data we're reading
-                defmt::info!("🔍 First, let's verify the bitmap data we're reading...");
-                display_manager.verify_flash_bitmap_data(&mut flash_manager).await.unwrap_or_default();
-
-                // Test different bitmap parsing methods for Flash fonts
-                defmt::info!("Testing different bitmap parsing methods...");
-                display_manager.test_flash_bitmap_parsing(10, 180, 'F', Rgb565::GREEN, &mut flash_manager).await.unwrap_or_default();
-
-                // Button indicators
-                display_manager.draw_text("BTN1", 10, 200, Rgb565::RED, &mut flash_manager).await.unwrap_or_default();
-                display_manager.draw_text("BTN3", 180, 200, Rgb565::CYAN, &mut flash_manager).await.unwrap_or_default();
+            // Title with 16px font
+            match display_manager.draw_text_16px("Flash Viewer 16px", 10, 20, Rgb565::WHITE, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Title rendered with 16px font"),
+                Err(e) => defmt::error!("❌ Failed to render title: {}", e),
             }
+
+            // Flash info with 16px font
+            match display_manager.draw_text_16px("JEDEC: EF4018", 10, 45, Rgb565::CYAN, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Flash info rendered"),
+                Err(e) => defmt::error!("❌ Failed to render flash info: {}", e),
+            }
+
+            match display_manager.draw_text_16px("Size: 16MB", 10, 70, Rgb565::GREEN, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Size info rendered"),
+                Err(e) => defmt::error!("❌ Failed to render size info: {}", e),
+            }
+
+            // Chinese character test with 16px font
+            match display_manager.draw_text_16px("中文显示测试", 10, 95, Rgb565::MAGENTA, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Chinese text rendered with 16px font"),
+                Err(e) => defmt::error!("❌ Failed to render Chinese text: {}", e),
+            }
+
+            // Mixed text test
+            match display_manager.draw_text_16px("Hello 世界!", 10, 120, Rgb565::YELLOW, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Mixed text rendered"),
+                Err(e) => defmt::error!("❌ Failed to render mixed text: {}", e),
+            }
+
+            // Status
+            match display_manager.draw_text_16px("16px Ready!", 10, 145, Rgb565::WHITE, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Status rendered"),
+                Err(e) => defmt::error!("❌ Failed to render status: {}", e),
+            }
+
+            defmt::info!("✅ Step 2: Text rendering completed");
         }
         Err(e) => {
             defmt::error!("❌ Flash initialization failed: {}", e);
@@ -257,46 +262,78 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    // Wait before starting main loop
+    // Wait before final step
     Timer::after(Duration::from_millis(3000)).await;
 
-    // Skip font test - no fonts in firmware
-    defmt::info!("Skipping font test (no fonts in firmware)");
+    // Step 3: Finally render the boot screen image from Flash and keep it displayed
+    defmt::info!("🖼️ Step 3: Rendering boot screen image from Flash...");
 
-    // Start main loop
-    defmt::info!("🎮 Starting main loop...");
+    // 🎬 Start three-screen cycling display system
+    defmt::info!("🎬 Starting three-screen cycling display system...");
 
-    let mut button_count = 0;
+    let mut screen_index = 0u8;
+    let screen_duration = Duration::from_millis(4000); // 4 seconds per screen
 
     loop {
-        // Handle button input with visual feedback
-        if btn1.is_low() {
-            button_count += 1;
-            defmt::info!("🔼 BTN1 pressed! Count: {}", button_count);
+        match screen_index {
+            // 第一屏：启动图片屏幕
+            0 => {
+                defmt::info!("📺 Screen 1/3: Boot Screen Image");
+                match display_manager.show_boot_screen(&mut flash_manager).await {
+                    Ok(()) => {
+                        defmt::info!("✅ Boot screen image displayed successfully");
+                    }
+                    Err(e) => {
+                        defmt::error!("❌ Failed to show boot screen image: {}", e);
+                        display_manager.clear(Rgb565::RED).await.unwrap_or_default();
+                        display_manager.draw_text_16px("Boot Image Failed", 10, 100, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
+                    }
+                }
+            }
 
-            // Flash BTN1 indicator
-            display_manager.draw_text("BTN1", 10, 200, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
-            Timer::after(Duration::from_millis(100)).await;
-            display_manager.draw_text("BTN1", 10, 200, Rgb565::RED, &mut flash_manager).await.unwrap_or_default();
+            // 第二屏：12px字体文字屏幕
+            1 => {
+                defmt::info!("📺 Screen 2/3: 12px Font Text");
+                display_manager.clear(Rgb565::BLACK).await.unwrap_or_default();
 
-            Timer::after(Duration::from_millis(200)).await; // Debounce
+                // 显示系统信息
+                display_manager.draw_text("STM32G431 Flash Viewer", 10, 20, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Flash: W25Q128JV (16MB)", 10, 40, Rgb565::CYAN, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Display: 320x172 RGB565", 10, 60, Rgb565::GREEN, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Status: Running OK", 10, 80, Rgb565::YELLOW, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Memory: Boot+Font+Data", 10, 100, Rgb565::MAGENTA, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Mode: Cycling Display", 10, 120, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text("Screen 2/3 - 12px Font", 10, 150, Rgb565::BLUE, &mut flash_manager).await.unwrap_or_default();
+            }
+
+            // 第三屏：16px字体文字屏幕
+            2 => {
+                defmt::info!("📺 Screen 3/3: 16px Font Text");
+                display_manager.clear(Rgb565::BLACK).await.unwrap_or_default();
+
+                // 显示版本和状态信息
+                display_manager.draw_text_16px("Flash Content Viewer", 10, 20, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text_16px("Version: v1.0.0", 10, 45, Rgb565::CYAN, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text_16px("Build: 2024-08-18", 10, 70, Rgb565::GREEN, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text_16px("MCU: STM32G431CBU6", 10, 95, Rgb565::YELLOW, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text_16px("Freq: 170MHz", 10, 120, Rgb565::MAGENTA, &mut flash_manager).await.unwrap_or_default();
+                display_manager.draw_text_16px("Screen 3/3 - 16px", 10, 145, Rgb565::BLUE, &mut flash_manager).await.unwrap_or_default();
+            }
+
+            _ => {
+                // 重置到第一屏
+                screen_index = 0;
+                continue;
+            }
         }
 
-        if btn3.is_low() {
-            button_count += 1;
-            defmt::info!("✅ BTN3 pressed! Count: {}", button_count);
+        // 等待指定时间后切换到下一屏
+        Timer::after(screen_duration).await;
 
-            // Flash BTN3 indicator
-            display_manager.draw_text("BTN3", 180, 200, Rgb565::WHITE, &mut flash_manager).await.unwrap_or_default();
-            Timer::after(Duration::from_millis(100)).await;
-            display_manager.draw_text("BTN3", 180, 200, Rgb565::CYAN, &mut flash_manager).await.unwrap_or_default();
+        // 切换到下一屏
+        screen_index = (screen_index + 1) % 3;
 
-            Timer::after(Duration::from_millis(200)).await; // Debounce
-        }
-
-        // Small delay and prevent infinite loop optimization
-        Timer::after(Duration::from_millis(50)).await;
-        cortex_m::asm::wfi();
+        defmt::debug!("🔄 Switching to next screen...");
     }
 }
 

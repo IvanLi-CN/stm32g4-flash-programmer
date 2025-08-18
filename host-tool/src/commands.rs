@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
+use crc32fast::Hasher;
 use flash_protocol::*;
 use indicatif::ProgressBar;
-use sha2::{Sha256, Digest};
-use crc32fast::Hasher;
+use sha2::{Digest, Sha256};
 
 use crate::serial::SerialConnection;
 
@@ -33,16 +33,28 @@ impl<'a> FlashCommands<'a> {
         }
 
         let jedec_id = u32::from_le_bytes([
-            response.data[0], response.data[1], response.data[2], response.data[3]
+            response.data[0],
+            response.data[1],
+            response.data[2],
+            response.data[3],
         ]);
         let total_size = u32::from_le_bytes([
-            response.data[4], response.data[5], response.data[6], response.data[7]
+            response.data[4],
+            response.data[5],
+            response.data[6],
+            response.data[7],
         ]);
         let page_size = u32::from_le_bytes([
-            response.data[8], response.data[9], response.data[10], response.data[11]
+            response.data[8],
+            response.data[9],
+            response.data[10],
+            response.data[11],
         ]);
         let sector_size = u32::from_le_bytes([
-            response.data[12], response.data[13], response.data[14], response.data[15]
+            response.data[12],
+            response.data[13],
+            response.data[14],
+            response.data[15],
         ]);
 
         Ok(FlashInfo {
@@ -80,7 +92,9 @@ impl<'a> FlashCommands<'a> {
             let chunk = &remaining_data[..chunk_size];
 
             let packet = Packet::new(Command::Write, current_address, chunk.to_vec());
-            self.connection.send_command(packet).await
+            self.connection
+                .send_command(packet)
+                .await
                 .with_context(|| format!("Failed to write at address 0x{:08X}", current_address))?;
 
             current_address += chunk_size as u32;
@@ -90,12 +104,23 @@ impl<'a> FlashCommands<'a> {
         Ok(())
     }
 
-    pub async fn write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
-        self.stream_write_with_progress(address, data, progress).await
+    pub async fn write_with_progress(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
+        self.stream_write_with_progress(address, data, progress)
+            .await
     }
 
     /// High-speed write with optimized 4KB packets
-    pub async fn batch_write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn batch_write_with_progress(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         let mut current_address = address;
         let mut remaining_data = data;
         let mut written = 0;
@@ -106,10 +131,17 @@ impl<'a> FlashCommands<'a> {
             let chunk = &remaining_data[..chunk_size];
 
             // Use regular Write command with 4KB packets for maximum compatibility
-            let packet = Packet::new_with_sequence(Command::Write, current_address, chunk.to_vec(), sequence);
+            let packet = Packet::new_with_sequence(
+                Command::Write,
+                current_address,
+                chunk.to_vec(),
+                sequence,
+            );
 
             // Send and wait for ACK - simplified approach
-            self.connection.send_command(packet).await
+            self.connection
+                .send_command(packet)
+                .await
                 .with_context(|| format!("Failed to write at address 0x{:08X}", current_address))?;
 
             current_address += chunk_size as u32;
@@ -135,7 +167,10 @@ impl<'a> FlashCommands<'a> {
             let mut packet = Packet::new(Command::Read, current_address, Vec::new());
             packet.length = chunk_size;
             packet.crc = packet.calculate_crc();
-            let response = self.connection.send_command(packet).await
+            let response = self
+                .connection
+                .send_command(packet)
+                .await
                 .with_context(|| format!("Failed to read at address 0x{:08X}", current_address))?;
 
             result.extend_from_slice(&response.data);
@@ -146,7 +181,12 @@ impl<'a> FlashCommands<'a> {
         Ok(result)
     }
 
-    pub async fn read_with_progress(&mut self, address: u32, size: u32, progress: &ProgressBar) -> Result<Vec<u8>> {
+    pub async fn read_with_progress(
+        &mut self,
+        address: u32,
+        size: u32,
+        progress: &ProgressBar,
+    ) -> Result<Vec<u8>> {
         let mut result = Vec::new();
         let mut current_address = address;
         let mut remaining_size = size;
@@ -159,12 +199,16 @@ impl<'a> FlashCommands<'a> {
             let chunk_size = std::cmp::min(remaining_size, MAX_READ_SIZE);
 
             // Use the correct protocol format - empty data field, size in length field
-            let mut packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
+            let mut packet =
+                Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             packet.length = chunk_size;
             // Recalculate CRC after modifying length field
             packet.crc = packet.calculate_crc();
 
-            let response = self.connection.send_command(packet).await
+            let response = self
+                .connection
+                .send_command(packet)
+                .await
                 .with_context(|| format!("Failed to read at address 0x{:08X}", current_address))?;
 
             result.extend_from_slice(&response.data);
@@ -188,8 +232,12 @@ impl<'a> FlashCommands<'a> {
             let chunk = &remaining_data[..chunk_size];
 
             let packet = Packet::new(Command::Verify, current_address, chunk.to_vec());
-            self.connection.send_command(packet).await
-                .with_context(|| format!("Verification failed at address 0x{:08X}", current_address))?;
+            self.connection
+                .send_command(packet)
+                .await
+                .with_context(|| {
+                    format!("Verification failed at address 0x{:08X}", current_address)
+                })?;
 
             current_address += chunk_size as u32;
             remaining_data = &remaining_data[chunk_size..];
@@ -198,7 +246,12 @@ impl<'a> FlashCommands<'a> {
         Ok(())
     }
 
-    pub async fn verify_with_progress(&mut self, address: u32, expected_data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn verify_with_progress(
+        &mut self,
+        address: u32,
+        expected_data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         let mut current_address = address;
         let mut remaining_data = expected_data;
         let mut verified = 0;
@@ -208,13 +261,17 @@ impl<'a> FlashCommands<'a> {
             let chunk = &remaining_data[..chunk_size];
 
             let packet = Packet::new(Command::Verify, current_address, chunk.to_vec());
-            self.connection.send_command(packet).await
-                .with_context(|| format!("Verification failed at address 0x{:08X}", current_address))?;
+            self.connection
+                .send_command(packet)
+                .await
+                .with_context(|| {
+                    format!("Verification failed at address 0x{:08X}", current_address)
+                })?;
 
             current_address += chunk_size as u32;
             remaining_data = &remaining_data[chunk_size..];
             verified += chunk_size;
-            
+
             progress.set_position(verified as u64);
         }
 
@@ -222,7 +279,12 @@ impl<'a> FlashCommands<'a> {
     }
 
     /// Ultra-high-speed burst stream write with data integrity verification
-    pub async fn stream_write_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn stream_write_with_progress(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         let mut current_address = address;
         let mut remaining_data = data;
         let mut written = 0;
@@ -245,7 +307,12 @@ impl<'a> FlashCommands<'a> {
                 let chunk = &remaining_data[..chunk_size];
 
                 // Use StreamWrite command - no ACK expected
-                let packet = Packet::new_with_sequence(Command::StreamWrite, current_address, chunk.to_vec(), sequence);
+                let packet = Packet::new_with_sequence(
+                    Command::StreamWrite,
+                    current_address,
+                    chunk.to_vec(),
+                    sequence,
+                );
                 batch_packets.push(packet);
 
                 current_address += chunk_size as u32;
@@ -256,7 +323,9 @@ impl<'a> FlashCommands<'a> {
 
             // Send entire batch rapidly
             for packet in batch_packets.iter() {
-                self.connection.send_packet_no_ack(packet.clone()).await
+                self.connection
+                    .send_packet_no_ack(packet.clone())
+                    .await
                     .context("Failed to send batch stream write packet")?;
 
                 // Minimal yield to prevent blocking
@@ -278,7 +347,12 @@ impl<'a> FlashCommands<'a> {
     }
 
     /// Verify written data by reading back and comparing
-    pub async fn verify_write(&mut self, address: u32, expected_data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn verify_write(
+        &mut self,
+        address: u32,
+        expected_data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         let mut current_address = address;
         let mut remaining_data = expected_data;
         let mut verified = 0;
@@ -294,17 +368,28 @@ impl<'a> FlashCommands<'a> {
             let expected_chunk = &remaining_data[..chunk_size];
 
             // Read back the data - use length field for size, data field should be empty
-            let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
+            let mut read_packet =
+                Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             read_packet.length = chunk_size as u32;
             read_packet.crc = read_packet.calculate_crc();
-            let response = self.connection.send_command(read_packet).await
-                .with_context(|| format!("Failed to read back data at address 0x{:08X}", current_address))?;
+            let response = self
+                .connection
+                .send_command(read_packet)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to read back data at address 0x{:08X}",
+                        current_address
+                    )
+                })?;
 
             // Compare with expected data
             if response.data != expected_chunk {
                 // Find first differing byte for better error reporting
                 let mut first_diff = None;
-                for (i, (expected, actual)) in expected_chunk.iter().zip(response.data.iter()).enumerate() {
+                for (i, (expected, actual)) in
+                    expected_chunk.iter().zip(response.data.iter()).enumerate()
+                {
                     if expected != actual {
                         first_diff = Some((i, *expected, *actual));
                         break;
@@ -339,7 +424,12 @@ impl<'a> FlashCommands<'a> {
     }
 
     /// End-to-end verification using SHA256 hash comparison
-    pub async fn verify_with_hash(&mut self, address: u32, original_data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn verify_with_hash(
+        &mut self,
+        address: u32,
+        original_data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         progress.set_message("Computing original data hash...");
 
         // Calculate SHA256 hash of original data
@@ -351,7 +441,9 @@ impl<'a> FlashCommands<'a> {
         progress.set_position(0);
 
         // Read back all data from flash
-        let flash_data = self.read_flash_data(address, original_data.len() as u32, progress).await?;
+        let flash_data = self
+            .read_flash_data(address, original_data.len() as u32, progress)
+            .await?;
 
         progress.set_message("Computing flash data hash...");
 
@@ -367,13 +459,19 @@ impl<'a> FlashCommands<'a> {
         } else {
             Err(anyhow::anyhow!(
                 "❌ Hash verification failed!\nOriginal: {:x}\nFlash:    {:x}",
-                original_hash, flash_hash
+                original_hash,
+                flash_hash
             ))
         }
     }
 
     /// Read data from flash for verification
-    async fn read_flash_data(&mut self, address: u32, size: u32, progress: &ProgressBar) -> Result<Vec<u8>> {
+    async fn read_flash_data(
+        &mut self,
+        address: u32,
+        size: u32,
+        progress: &ProgressBar,
+    ) -> Result<Vec<u8>> {
         let mut result = Vec::new();
         let mut current_address = address;
         let mut remaining_size = size;
@@ -385,13 +483,22 @@ impl<'a> FlashCommands<'a> {
             let chunk_size = std::cmp::min(remaining_size, MAX_READ_SIZE);
 
             // Read back the data - use length field for size
-            let mut read_packet = Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
+            let mut read_packet =
+                Packet::new_with_sequence(Command::Read, current_address, Vec::new(), sequence);
             read_packet.length = chunk_size;
             // Recalculate CRC after modifying length field
             read_packet.crc = read_packet.calculate_crc();
 
-            let response = self.connection.send_command(read_packet).await
-                .with_context(|| format!("Failed to read flash data at address 0x{:08X}", current_address))?;
+            let response = self
+                .connection
+                .send_command(read_packet)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to read flash data at address 0x{:08X}",
+                        current_address
+                    )
+                })?;
 
             result.extend_from_slice(&response.data);
             current_address += chunk_size;
@@ -405,7 +512,12 @@ impl<'a> FlashCommands<'a> {
     }
 
     /// CRC-based data integrity verification (doesn't require reading back data)
-    pub async fn verify_with_crc(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn verify_with_crc(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         progress.set_message("Computing CRC32 checksum...");
 
         // Calculate CRC32 of original data
@@ -425,26 +537,36 @@ impl<'a> FlashCommands<'a> {
                     progress.set_message("✅ CRC verification successful!");
                     Ok(())
                 } else {
-                    Err(anyhow::anyhow!("❌ CRC verification failed! Flash data doesn't match expected checksum."))
+                    Err(anyhow::anyhow!(
+                        "❌ CRC verification failed! Flash data doesn't match expected checksum."
+                    ))
                 }
             }
             Err(e) => {
                 // If CRC verification is not supported by firmware, fall back to warning
                 progress.set_message("⚠️  CRC verification not supported by firmware");
-                eprintln!("Warning: CRC verification failed ({}), but data was transmitted successfully", e);
+                eprintln!(
+                    "Warning: CRC verification failed ({}), but data was transmitted successfully",
+                    e
+                );
                 Ok(())
             }
         }
     }
 
     /// Progressive block-based CRC verification for large files
-    pub async fn verify_with_progressive_crc(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn verify_with_progressive_crc(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         const VERIFY_BLOCK_SIZE: usize = 64 * 1024; // 64KB per block
 
         let mut current_address = address;
         let mut remaining_data = data;
         let mut block_index = 0;
-        let total_blocks = (data.len() + VERIFY_BLOCK_SIZE - 1) / VERIFY_BLOCK_SIZE;
+        let _total_blocks = data.len().div_ceil(VERIFY_BLOCK_SIZE);
 
         progress.set_message("Starting progressive CRC verification...");
         progress.set_position(0);
@@ -466,7 +588,12 @@ impl<'a> FlashCommands<'a> {
             crc_data.extend_from_slice(&expected_crc.to_le_bytes());
             crc_data.extend_from_slice(&(block_size as u32).to_le_bytes());
 
-            let verify_packet = Packet::new_with_sequence(Command::VerifyCRC, current_address, crc_data, (block_index + 1) as u16);
+            let verify_packet = Packet::new_with_sequence(
+                Command::VerifyCRC,
+                current_address,
+                crc_data,
+                (block_index + 1) as u16,
+            );
 
             match self.connection.send_command(verify_packet).await {
                 Ok(response) => {
@@ -482,7 +609,9 @@ impl<'a> FlashCommands<'a> {
                 Err(e) => {
                     return Err(anyhow::anyhow!(
                         "❌ Block {} verification communication error at address 0x{:08X}: {}",
-                        block_index + 1, current_address, e
+                        block_index + 1,
+                        current_address,
+                        e
                     ));
                 }
             }
@@ -502,14 +631,21 @@ impl<'a> FlashCommands<'a> {
     }
 
     /// High-speed write with progressive CRC-based verification
-    pub async fn write_and_verify_with_progress(&mut self, address: u32, data: &[u8], progress: &ProgressBar) -> Result<()> {
+    pub async fn write_and_verify_with_progress(
+        &mut self,
+        address: u32,
+        data: &[u8],
+        progress: &ProgressBar,
+    ) -> Result<()> {
         // Phase 1: High-speed write
         progress.set_message("Writing data to flash...");
-        self.stream_write_with_progress(address, data, progress).await?;
+        self.stream_write_with_progress(address, data, progress)
+            .await?;
 
         // Phase 2: Progressive CRC-based verification (much faster and more reliable)
         progress.set_message("Performing progressive CRC verification...");
-        self.verify_with_progressive_crc(address, data, progress).await?;
+        self.verify_with_progressive_crc(address, data, progress)
+            .await?;
 
         Ok(())
     }

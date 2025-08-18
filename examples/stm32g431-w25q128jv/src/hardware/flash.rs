@@ -24,7 +24,7 @@ impl FlashManager {
             initialized: false,
         }
     }
-    
+
     /// Initialize flash with SPI device
     pub async fn initialize(
         &mut self,
@@ -41,7 +41,7 @@ impl FlashManager {
         defmt::info!("Flash SPI device initialized");
         Ok(())
     }
-    
+
     /// Check if flash is initialized
     pub fn is_initialized(&self) -> bool {
         self.initialized
@@ -163,7 +163,7 @@ impl FlashManager {
         defmt::debug!("Read {} bytes from Flash cache starting at address 0x{:08X}", length, address);
         Ok(result)
     }
-    
+
     /// Read a small chunk of data (for headers, etc.)
     pub async fn read_chunk(&mut self, address: u32, length: usize) -> Result<Vec<u8, 256>, &'static str> {
         if length > 256 {
@@ -181,7 +181,7 @@ impl FlashManager {
     }
 
     // Write method removed - no fonts stored in firmware
-    
+
     /// Get flash information (simplified for now)
     pub async fn get_flash_info(&mut self) -> Result<FlashInfo, &'static str> {
         if !self.initialized {
@@ -197,12 +197,12 @@ impl FlashManager {
             block_size: 65536,
         })
     }
-    
+
     /// Get cache statistics
     pub fn get_cache_stats(&self) -> crate::resources::cache::CacheStats {
         self.cache.stats()
     }
-    
+
     /// Clear cache
     pub fn clear_cache(&mut self) {
         self.cache.clear();

@@ -24,7 +24,7 @@ A high-performance USB-based external flash programmer for STM32G4 microcontroll
 
 ### ⚡ SPI Flash Connections (Critical!)
 - **SCK**: PB13 (SPI2_SCK)
-- **MISO**: PB14 (SPI2_MISO)  
+- **MISO**: PB14 (SPI2_MISO)
 - **MOSI**: PB15 (SPI2_MOSI)
 - **CS**: **PB12** (GPIO Output) ⚠️ **Must be PB12!**
 - **WP#**: **PB11** (GPIO Output, pulled HIGH) ⚠️ **Must be PB11!**
@@ -125,7 +125,7 @@ The recommended workflow for flash programming:
 
 ### Commands
 - **1**: Info - Get flash information
-- **2**: Erase - Erase flash sectors  
+- **2**: Erase - Erase flash sectors
 - **3**: Write - Write data to flash
 - **4**: Read - Read data from flash
 - **8**: StreamWrite - Optimized write operation
@@ -150,7 +150,7 @@ The recommended workflow for flash programming:
 ## 📊 Performance
 
 - **Write Speed**: ~40 KB/s
-- **Read Speed**: ~50 KB/s  
+- **Read Speed**: ~50 KB/s
 - **Erase Speed**: ~60 KB/s
 - **USB Latency**: <10ms
 - **Maximum File Size**: 16MB (W25Q128 capacity)
@@ -172,7 +172,7 @@ This project has been thoroughly tested and verified:
 - ✅ Hardware connections confirmed
 - ✅ SPI communication working
 - ✅ Write operations successful
-- ✅ Read operations successful  
+- ✅ Read operations successful
 - ✅ Erase operations successful
 - ✅ Automatic erase functionality working
 - ✅ Data verification working

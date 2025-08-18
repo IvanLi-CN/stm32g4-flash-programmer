@@ -56,27 +56,27 @@ jobs:
         run: |
           # Create artifacts directory
           mkdir -p artifacts
-          
+
           # Flash programmer (host binary)
           cp flash_programmer/target/release/flash_programmer artifacts/flash_programmer
-          
+
           # Flash test image (embedded binary)
           cp flash_test_image/target/thumbv7em-none-eabihf/release/flash_test_image artifacts/flash_test_image.elf
-          
+
           # Generate binary file for flash_test_image
           cd flash_test_image && cargo objcopy --target thumbv7em-none-eabihf --release --bin flash_test_image -- -O binary ../artifacts/flash_test_image.bin
-          
+
           # Generate hex file for flash_test_image
           cargo objcopy --target thumbv7em-none-eabihf --release --bin flash_test_image -- -O ihex ../artifacts/flash_test_image.hex
-          
+
           # Generate size report for flash_test_image
           cargo size --target thumbv7em-none-eabihf --release --bin flash_test_image > ../artifacts/flash_test_image-size-report.txt
-          
+
           # Generate memory map for flash_test_image
           cargo nm --target thumbv7em-none-eabihf --release --bin flash_test_image | sort > ../artifacts/flash_test_image-memory-map.txt
-          
+
           cd ..
-          
+
           # Main project (png converter)
           cp target/release/png_to_bitmap artifacts/png_to_bitmap
 

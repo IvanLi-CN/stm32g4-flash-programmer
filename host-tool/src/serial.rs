@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use flash_protocol::*;
 use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::timeout;
 use tokio_serial::SerialStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub struct SerialConnection {
     port: SerialStream,
@@ -21,7 +21,9 @@ impl SerialConnection {
         let data = packet.to_bytes();
 
         // Send packet
-        self.port.write_all(&data).await
+        self.port
+            .write_all(&data)
+            .await
             .context("Failed to write packet to serial port")?;
 
         Ok(())

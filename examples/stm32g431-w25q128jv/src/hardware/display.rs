@@ -49,7 +49,7 @@ impl DisplayManager {
             height: 172,
         }
     }
-    
+
     /// Initialize display with real GC9307 driver
     pub async fn initialize(
         &mut self,
@@ -98,17 +98,17 @@ impl DisplayManager {
 
         Ok(())
     }
-    
+
     /// Check if display is initialized
     pub fn is_initialized(&self) -> bool {
         self.display.is_some()
     }
-    
+
     /// Get display dimensions
     pub fn dimensions(&self) -> (u16, u16) {
         (self.width, self.height)
     }
-    
+
     /// Clear display with color using real hardware
     pub async fn clear(&mut self, color: Rgb565) -> Result<(), &'static str> {
         if let Some(ref mut display) = self.display {
@@ -888,7 +888,7 @@ impl DisplayManager {
             _ => ([0; 8], 4), // Unknown character - blank space
         }
     }
-    
+
     /// Draw pixel (simplified)
     pub async fn draw_pixel(&mut self, x: i32, y: i32, color: Rgb565) -> Result<(), &'static str> {
         if let Some(ref mut display) = self.display {
@@ -901,7 +901,7 @@ impl DisplayManager {
             Err("Display not initialized")
         }
     }
-    
+
     /// Draw bitmap using write_area
     pub async fn draw_bitmap(
         &mut self,
@@ -942,7 +942,7 @@ impl DisplayManager {
             Err("Display not initialized")
         }
     }
-    
+
     /// Draw RGB565 image data (simplified)
     pub async fn draw_image(
         &mut self,
@@ -1043,7 +1043,7 @@ impl DisplayManager {
             Err("Display not initialized")
         }
     }
-    
+
     /// Show startup screen
     pub async fn show_startup_screen(
         &mut self,
@@ -1064,7 +1064,7 @@ impl DisplayManager {
 
         Ok(())
     }
-    
+
     /// Show error message
     pub async fn show_error(
         &mut self,

@@ -10,7 +10,7 @@ impl HardwareCrc {
     pub fn new(crc: Crc<'static>) -> Self {
         Self { crc }
     }
-    
+
     /// Calculate CRC-32 for packet
     pub fn calculate_packet_crc(&mut self, packet: &Packet) -> u32 {
         self.crc.reset();
@@ -23,7 +23,9 @@ impl HardwareCrc {
         buffer.push(packet.command as u8).ok();
         buffer.extend_from_slice(&packet.length.to_le_bytes()).ok();
         buffer.extend_from_slice(&packet.address.to_le_bytes()).ok();
-        buffer.extend_from_slice(&packet.sequence.to_le_bytes()).ok();
+        buffer
+            .extend_from_slice(&packet.sequence.to_le_bytes())
+            .ok();
         buffer.extend_from_slice(&packet.data).ok();
 
         // Feed all bytes to CRC
@@ -31,7 +33,7 @@ impl HardwareCrc {
 
         self.crc.read()
     }
-    
+
     /// Calculate CRC-32 for response
     pub fn calculate_response_crc(&mut self, response: &Response) -> u32 {
         self.crc.reset();
@@ -42,7 +44,9 @@ impl HardwareCrc {
         // Add fields in little-endian byte order (same as software)
         buffer.extend_from_slice(&response.magic.to_le_bytes()).ok();
         buffer.push(response.status as u8).ok();
-        buffer.extend_from_slice(&response.length.to_le_bytes()).ok();
+        buffer
+            .extend_from_slice(&response.length.to_le_bytes())
+            .ok();
         buffer.extend_from_slice(&response.data).ok();
 
         // Feed all bytes to CRC
@@ -50,7 +54,7 @@ impl HardwareCrc {
 
         self.crc.read()
     }
-    
+
     /// Feed bytes to CRC (handles non-word-aligned data)
     fn feed_bytes(&mut self, data: &[u8]) {
         // For now, use a simpler approach - feed bytes one by one

@@ -121,7 +121,7 @@ let mut batch = Vec::with_capacity(BATCH_SIZE);
 
 for chunk in data.chunks(MAX_PAYLOAD_SIZE) {
     batch.push(create_packet(chunk));
-    
+
     if batch.len() == BATCH_SIZE {
         send_batch(&mut batch).await?;
         batch.clear();
@@ -321,6 +321,6 @@ fn is_compatible(host_version: &ProtocolVersion, device_version: &ProtocolVersio
 
 ---
 
-**📝 文档版本**: v2.0  
-**🐾 作者**: 鸣濑白羽 (猫娘心羽)  
+**📝 文档版本**: v2.0
+**🐾 作者**: 鸣濑白羽 (猫娘心羽)
 **📅 更新时间**: 2024年

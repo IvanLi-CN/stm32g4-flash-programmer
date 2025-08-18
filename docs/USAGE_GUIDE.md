@@ -242,6 +242,6 @@ echo 16384 | sudo tee /sys/module/usbcore/parameters/usbfs_memory_mb
 
 ---
 
-**📝 文档版本**: v2.0  
-**🐾 作者**: 鸣濑白羽 (猫娘心羽)  
+**📝 文档版本**: v2.0
+**🐾 作者**: 鸣濑白羽 (猫娘心羽)
 **📅 更新时间**: 2024年

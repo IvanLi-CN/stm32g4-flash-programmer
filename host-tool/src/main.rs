@@ -6,11 +6,11 @@ use std::time::Duration;
 use tokio::fs;
 use tokio::time::timeout;
 
-mod serial;
 mod commands;
+mod serial;
 
-use serial::SerialConnection;
 use commands::FlashCommands;
+use serial::SerialConnection;
 
 #[derive(Parser)]
 #[command(name = "flash-programmer")]
@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
     // Connect to device
     let mut connection = timeout(
         Duration::from_secs(cli.timeout),
-        SerialConnection::new(&cli.port, cli.baud)
+        SerialConnection::new(&cli.port, cli.baud),
     )
     .await
     .context("Connection timeout")?
@@ -125,11 +125,17 @@ async fn main() -> Result<()> {
             let info = flash_commands.get_info().await?;
             println!("Flash Information:");
             println!("  JEDEC ID: 0x{:06X}", info.jedec_id);
-            println!("  Total Size: {} MB ({} bytes)",
-                     info.total_size / (1024 * 1024), info.total_size);
+            println!(
+                "  Total Size: {} MB ({} bytes)",
+                info.total_size / (1024 * 1024),
+                info.total_size
+            );
             println!("  Page Size: {} bytes", info.page_size);
-            println!("  Sector Size: {} KB ({} bytes)",
-                     info.sector_size / 1024, info.sector_size);
+            println!(
+                "  Sector Size: {} KB ({} bytes)",
+                info.sector_size / 1024,
+                info.sector_size
+            );
         }
 
         Commands::Status => {
@@ -137,38 +143,72 @@ async fn main() -> Result<()> {
             let status = flash_commands.read_status().await?;
 
             println!("Flash Status Register: 0x{:02X}", status);
-            println!("  Write In Progress (WIP): {}", if status & 0x01 != 0 { "Yes" } else { "No" });
-            println!("  Write Enable Latch (WEL): {}", if status & 0x02 != 0 { "Yes" } else { "No" });
-            println!("  Block Protect Bits (BP0-BP2): 0x{:01X}", (status >> 2) & 0x07);
-            println!("  Top/Bottom Protect (TB): {}", if status & 0x20 != 0 { "Top" } else { "Bottom" });
-            println!("  Sector Protect (SEC): {}", if status & 0x40 != 0 { "Yes" } else { "No" });
-            println!("  Status Register Protect (SRP0): {}", if status & 0x80 != 0 { "Yes" } else { "No" });
+            println!(
+                "  Write In Progress (WIP): {}",
+                if status & 0x01 != 0 { "Yes" } else { "No" }
+            );
+            println!(
+                "  Write Enable Latch (WEL): {}",
+                if status & 0x02 != 0 { "Yes" } else { "No" }
+            );
+            println!(
+                "  Block Protect Bits (BP0-BP2): 0x{:01X}",
+                (status >> 2) & 0x07
+            );
+            println!(
+                "  Top/Bottom Protect (TB): {}",
+                if status & 0x20 != 0 { "Top" } else { "Bottom" }
+            );
+            println!(
+                "  Sector Protect (SEC): {}",
+                if status & 0x40 != 0 { "Yes" } else { "No" }
+            );
+            println!(
+                "  Status Register Protect (SRP0): {}",
+                if status & 0x80 != 0 { "Yes" } else { "No" }
+            );
         }
 
         Commands::Erase { address, size } => {
-            println!("Erasing flash at 0x{:08X}, size: {} bytes...", address, size);
-            
+            println!(
+                "Erasing flash at 0x{:08X}, size: {} bytes...",
+                address, size
+            );
+
             let pb = ProgressBar::new(1);
-            pb.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] {msg}")
-                .unwrap());
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] {msg}")
+                    .unwrap(),
+            );
             pb.set_message("Erasing...");
 
             flash_commands.erase(address, size).await?;
-            
+
             pb.finish_with_message("Erase completed!");
             println!("Flash erased successfully!");
         }
 
-        Commands::Write { file, address, erase, verify, basic } => {
+        Commands::Write {
+            file,
+            address,
+            erase,
+            verify,
+            basic,
+        } => {
             println!("Reading file: {:?}", file);
-            let data = fs::read(&file).await
+            let data = fs::read(&file)
+                .await
                 .with_context(|| format!("Failed to read file: {:?}", file))?;
-            
+
             println!("File size: {} bytes", data.len());
-            
+
             if erase {
-                println!("Erasing flash at 0x{:08X}, size: {} bytes...", address, data.len());
+                println!(
+                    "Erasing flash at 0x{:08X}, size: {} bytes...",
+                    address,
+                    data.len()
+                );
                 flash_commands.erase(address, data.len() as u32).await?;
                 println!("Erase completed!");
             }
@@ -185,13 +225,17 @@ async fn main() -> Result<()> {
                     flash_commands.write(address, &data).await?;
                     pb.set_position(data.len() as u64);
                 } else {
-                    flash_commands.write_with_progress(address, &data, &pb).await?;
+                    flash_commands
+                        .write_with_progress(address, &data, &pb)
+                        .await?;
                 }
                 pb.finish_with_message("Write completed!");
 
                 // Then verify using progressive CRC (fast and reliable verification)
                 println!("Verifying written data using progressive CRC32...");
-                flash_commands.verify_with_progressive_crc(address, &data, &pb).await?;
+                flash_commands
+                    .verify_with_progressive_crc(address, &data, &pb)
+                    .await?;
                 pb.finish_with_message("Write and verification completed!");
                 println!("✅ Data written and verified successfully!");
             } else {
@@ -204,7 +248,9 @@ async fn main() -> Result<()> {
                     println!("✅ Data written successfully using basic write command!");
                 } else {
                     // Use high-speed write only
-                    flash_commands.write_with_progress(address, &data, &pb).await?;
+                    flash_commands
+                        .write_with_progress(address, &data, &pb)
+                        .await?;
                     pb.finish_with_message("Write completed!");
                     println!("✅ Data written successfully!");
                 }
@@ -212,39 +258,49 @@ async fn main() -> Result<()> {
             }
         }
 
-        Commands::Read { file, address, size } => {
+        Commands::Read {
+            file,
+            address,
+            size,
+        } => {
             println!("Reading {} bytes from flash at 0x{:08X}...", size, address);
-            
+
             let pb = ProgressBar::new(size as u64);
             pb.set_style(ProgressStyle::default_bar()
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap());
 
-            let data = flash_commands.read_with_progress(address, size, &pb).await?;
-            
+            let data = flash_commands
+                .read_with_progress(address, size, &pb)
+                .await?;
+
             pb.finish_with_message("Read completed!");
 
             println!("Writing to file: {:?}", file);
-            fs::write(&file, &data).await
+            fs::write(&file, &data)
+                .await
                 .with_context(|| format!("Failed to write file: {:?}", file))?;
-            
+
             println!("File saved successfully!");
         }
 
         Commands::Verify { file, address } => {
             println!("Reading file: {:?}", file);
-            let data = fs::read(&file).await
+            let data = fs::read(&file)
+                .await
                 .with_context(|| format!("Failed to read file: {:?}", file))?;
-            
+
             println!("Verifying {} bytes at 0x{:08X}...", data.len(), address);
-            
+
             let pb = ProgressBar::new(data.len() as u64);
             pb.set_style(ProgressStyle::default_bar()
                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.yellow/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap());
 
-            flash_commands.verify_with_progressive_crc(address, &data, &pb).await?;
-            
+            flash_commands
+                .verify_with_progressive_crc(address, &data, &pb)
+                .await?;
+
             pb.finish_with_message("Verification completed!");
             println!("Verification successful!");
         }

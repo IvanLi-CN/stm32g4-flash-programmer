@@ -170,7 +170,8 @@ impl Packet {
             &self.address.to_le_bytes()[..],
             &self.sequence.to_le_bytes()[..],
             &self.data[..],
-        ].concat();
+        ]
+        .concat();
 
         for &byte in &data {
             crc ^= byte as u32;
@@ -301,7 +302,8 @@ impl Response {
             &[self.status as u8],
             &self.length.to_le_bytes()[..],
             &self.data[..],
-        ].concat();
+        ]
+        .concat();
 
         for &byte in &data {
             crc ^= byte as u32;
@@ -393,10 +395,10 @@ mod tests {
     fn test_packet_serialization() {
         let data = vec![0x01, 0x02, 0x03, 0x04];
         let packet = Packet::new(Command::Write, 0x1000, data.clone());
-        
+
         let bytes = packet.to_bytes();
         let decoded = Packet::from_bytes(&bytes).unwrap();
-        
+
         assert_eq!(packet.command, decoded.command);
         assert_eq!(packet.address, decoded.address);
         assert_eq!(packet.data, decoded.data);
@@ -407,10 +409,10 @@ mod tests {
     fn test_response_serialization() {
         let data = vec![0xAA, 0xBB, 0xCC, 0xDD];
         let response = Response::new(Status::Success, data.clone());
-        
+
         let bytes = response.to_bytes();
         let decoded = Response::from_bytes(&bytes).unwrap();
-        
+
         assert_eq!(response.status, decoded.status);
         assert_eq!(response.data, decoded.data);
         assert!(decoded.verify_crc());

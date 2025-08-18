@@ -1,0 +1,91 @@
+# Lefthook configuration for STM32G4 Flash Programmer
+# Fast and powerful Git hooks manager
+# https://github.com/evilmartians/lefthook
+
+# Pre-commit hooks - run before each commit
+pre-commit:
+  parallel: true
+  commands:
+    # Rust code formatting check
+    rust-fmt:
+      glob: "*.rs"
+      run: |
+        echo "🎨 Checking Rust code formatting..."
+        cd protocol && cargo fmt --check
+        cd ../host-tool && cargo fmt --check
+        cd ../firmware && cargo fmt --check
+      stage_fixed: true
+
+    # Rust linting with clippy
+    rust-clippy:
+      glob: "*.rs"
+      run: |
+        echo "🔍 Running Rust clippy checks..."
+        cd protocol && cargo clippy -- -D warnings
+        cd ../host-tool && cargo clippy -- -D warnings
+        cd ../firmware && cargo clippy -- -D warnings
+
+    # Markdown documentation check
+    markdown-lint:
+      glob: "*.md"
+      run: |
+        echo "📝 Checking markdown documentation..."
+        if command -v markdownlint-cli2 >/dev/null 2>&1; then
+          markdownlint-cli2 "**/*.md" "#target" "#node_modules"
+        else
+          echo "⚠️  markdownlint-cli2 not found. Install with: npm install -g markdownlint-cli2"
+          echo "Skipping markdown check..."
+        fi
+
+    # Check for common issues
+    trailing-whitespace:
+      glob: "*.{rs,md,yml,yaml,toml}"
+      run: |
+        echo "🧹 Checking for trailing whitespace..."
+        if grep -r '[[:space:]]$' --include="*.rs" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.toml" .; then
+          echo "❌ Found trailing whitespace. Please remove it."
+          exit 1
+        fi
+
+# Commit message hooks - run when writing commit messages
+commit-msg:
+  commands:
+    # Commitlint check
+    commitlint:
+      run: |
+        echo "📋 Checking commit message format..."
+        if command -v commitlint >/dev/null 2>&1; then
+          commitlint --edit $1
+        else
+          echo "⚠️  commitlint not found. Install with: npm install -g @commitlint/cli"
+          echo "Skipping commit message check..."
+        fi
+
+# Pre-push hooks - run before pushing to remote
+pre-push:
+  commands:
+    # Run tests before pushing
+    tests:
+      run: |
+        echo "🧪 Running tests before push..."
+        cd protocol && cargo test
+        cd ../host-tool && cargo test
+
+    # Build check
+    build-check:
+      run: |
+        echo "🔨 Checking if everything builds..."
+        cd protocol && cargo check
+        cd ../host-tool && cargo check
+        cd ../firmware && cargo check --target thumbv7em-none-eabihf
+
+# Skip hooks configuration
+skip_output:
+  - meta
+  - summary
+
+# Output configuration
+output:
+  - summary
+  - success
+  - failure

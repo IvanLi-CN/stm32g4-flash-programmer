@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(static_mut_refs)]
 
 extern crate alloc;
 use linked_list_allocator::LockedHeap;
@@ -13,13 +14,13 @@ use embassy_futures::join::join;
 use embassy_stm32::usb::Driver;
 use embassy_stm32::{bind_interrupts, peripherals, usb};
 
+use alloc::vec;
+use alloc::vec::Vec;
+use defmt_rtt as _;
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use embassy_usb::Builder;
 use flash_protocol::*;
 use panic_probe as _;
-use defmt_rtt as _;
-use alloc::vec::Vec;
-use alloc::vec;
 use static_cell::StaticCell;
 
 mod safe_flash;
@@ -40,7 +41,7 @@ static mut USB_STATE: State = State::new();
 
 // USB CDC buffer - standard size for CDC communication (currently unused)
 #[allow(dead_code)]
-static mut USB_RX_BUFFER: [u8; 64] = [0; 64];  // 64 bytes is standard for USB CDC
+static mut USB_RX_BUFFER: [u8; 64] = [0; 64]; // 64 bytes is standard for USB CDC
 
 // Optimized heap for dynamic allocation (16KB) to handle 4KB write packets
 static mut HEAP: [u8; 16384] = [0; 16384];
@@ -84,27 +85,27 @@ async fn main(_spawner: Spawner) {
         PolySize::Width32,
         0xFFFFFFFF,
         0x04C11DB7, // Standard CRC-32 polynomial
-    ).unwrap();
+    )
+    .unwrap();
     let crc = embassy_stm32::crc::Crc::new(p.CRC, crc_config);
     init_hardware_crc(crc);
     defmt::info!("Hardware CRC initialized");
 
     // Initialize SPI for external Flash
-    use embassy_stm32::spi::{Spi, Config as SpiConfig};
     use embassy_stm32::gpio::{Level, Speed};
-    use embassy_sync::mutex::Mutex;
+    use embassy_stm32::spi::{Config as SpiConfig, Spi};
     use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+    use embassy_sync::mutex::Mutex;
 
     // SPI2 pins for external Flash (based on actual hardware configuration)
     // SCK: PB13, MISO: PB14, MOSI: PB15, CS: PA8 (assumed)
     let mut spi_config = SpiConfig::default();
     spi_config.frequency = embassy_stm32::time::Hertz(500_000); // 500kHz SPI clock (slower for reliability)
-    // SPI Mode 0 for W25Q128 (CPOL=0, CPHA=0) - this is the default mode
+                                                                // SPI Mode 0 for W25Q128 (CPOL=0, CPHA=0) - this is the default mode
     let spi = Spi::new(
-        p.SPI2,
-        p.PB13, // SCK
-        p.PB15, // MOSI
-        p.PB14, // MISO
+        p.SPI2, p.PB13,     // SCK
+        p.PB15,     // MOSI
+        p.PB14,     // MISO
         p.DMA2_CH3, // TX DMA
         p.DMA2_CH2, // RX DMA
         spi_config,
@@ -122,7 +123,9 @@ async fn main(_spawner: Spawner) {
     defmt::info!("Flash control pins configured: WP#=HIGH(PB11), HOLD#=HIGH(PA10)");
 
     // Create shared SPI bus
-    static SPI_BUS: StaticCell<Mutex<CriticalSectionRawMutex, Spi<'static, embassy_stm32::mode::Async>>> = StaticCell::new();
+    static SPI_BUS: StaticCell<
+        Mutex<CriticalSectionRawMutex, Spi<'static, embassy_stm32::mode::Async>>,
+    > = StaticCell::new();
     let spi_bus = SPI_BUS.init(Mutex::new(spi));
 
     // Create SafeFlashManager with real SPI hardware
@@ -132,12 +135,14 @@ async fn main(_spawner: Spawner) {
     // CS pin is now managed internally by the flash manager
 
     // Try to initialize Flash
-    defmt::info!("Attempting to initialize SPI Flash on PB13(SCK), PB14(MISO), PB15(MOSI), PB12(CS)...");
+    defmt::info!(
+        "Attempting to initialize SPI Flash on PB13(SCK), PB14(MISO), PB15(MOSI), PB12(CS)..."
+    );
     match flash_manager.try_initialize().await {
         Ok(()) => {
             defmt::info!("✅ External Flash initialized successfully!");
             defmt::info!("Flash hardware is connected and responding to JEDEC ID requests");
-        },
+        }
         Err(e) => {
             defmt::warn!("❌ Flash initialization failed: {:?}", e);
             defmt::warn!("This could mean:");
@@ -145,13 +150,13 @@ async fn main(_spawner: Spawner) {
             defmt::warn!("  2. SPI pins are configured incorrectly");
             defmt::warn!("  3. Flash chip is not responding (wrong voltage, timing, etc.)");
             defmt::warn!("Continuing with fallback mode - Flash operations will return errors");
-        },
+        }
     };
 
     // Initialize USB
     let driver = Driver::new(p.USB, Irqs, p.PA12, p.PA11);
     defmt::info!("USB driver initialized");
-    
+
     // Create embassy-usb Config
     let mut usb_config = embassy_usb::Config::new(0xc0de, 0xcafe);
     usb_config.manufacturer = Some("STM32G4 Flash Programmer");
@@ -227,7 +232,10 @@ async fn protocol_handler_loop<'a>(
 
             // Add to packet buffer with size check
             if packet_buffer.len() + n > MAX_BUFFER_SIZE {
-                defmt::warn!("Buffer overflow protection: clearing buffer (was {} bytes)", packet_buffer.len());
+                defmt::warn!(
+                    "Buffer overflow protection: clearing buffer (was {} bytes)",
+                    packet_buffer.len()
+                );
                 packet_buffer.clear();
             }
             packet_buffer.extend_from_slice(&buffer[..n]);
@@ -235,8 +243,11 @@ async fn protocol_handler_loop<'a>(
 
             // Try to parse complete packets
             while let Some(packet) = try_parse_packet(&mut packet_buffer) {
-                defmt::info!("Protocol: Parsed packet - Address: 0x{:08x}, Length: {}",
-                            packet.address, packet.length);
+                defmt::info!(
+                    "Protocol: Parsed packet - Address: 0x{:08x}, Length: {}",
+                    packet.address,
+                    packet.length
+                );
 
                 // Process the command
                 let response = match packet.command {
@@ -286,20 +297,31 @@ async fn protocol_handler_loop<'a>(
                             Response::new(Status::InvalidAddress, Vec::new())
                         } else {
                             let size = u32::from_le_bytes([
-                                packet.data[0], packet.data[1], packet.data[2], packet.data[3]
+                                packet.data[0],
+                                packet.data[1],
+                                packet.data[2],
+                                packet.data[3],
                             ]);
 
-                            defmt::info!("Erasing {} bytes starting at address 0x{:08X}", size, packet.address);
+                            defmt::info!(
+                                "Erasing {} bytes starting at address 0x{:08X}",
+                                size,
+                                packet.address
+                            );
 
                             // Calculate number of sectors to erase (4KB per sector)
                             const SECTOR_SIZE: u32 = 4096;
                             let start_sector = packet.address / SECTOR_SIZE;
                             let end_address = packet.address + size;
-                            let end_sector = (end_address + SECTOR_SIZE - 1) / SECTOR_SIZE; // Round up
+                            let end_sector = end_address.div_ceil(SECTOR_SIZE); // Round up
                             let sectors_to_erase = end_sector - start_sector;
 
-                            defmt::info!("Erasing {} sectors (0x{:08X} to 0x{:08X})",
-                                sectors_to_erase, start_sector * SECTOR_SIZE, end_sector * SECTOR_SIZE);
+                            defmt::info!(
+                                "Erasing {} sectors (0x{:08X} to 0x{:08X})",
+                                sectors_to_erase,
+                                start_sector * SECTOR_SIZE,
+                                end_sector * SECTOR_SIZE
+                            );
 
                             // Erase all required sectors
                             let mut success = true;
@@ -310,7 +332,11 @@ async fn protocol_handler_loop<'a>(
                                         defmt::info!("Erased sector at 0x{:08X}", sector_address);
                                     }
                                     Err(e) => {
-                                        defmt::error!("Flash erase error at 0x{:08X}: {:?}", sector_address, e);
+                                        defmt::error!(
+                                            "Flash erase error at 0x{:08X}: {:?}",
+                                            sector_address,
+                                            e
+                                        );
                                         success = false;
                                         break;
                                     }
@@ -359,11 +385,18 @@ async fn protocol_handler_loop<'a>(
                         defmt::info!("Protocol: Processing StreamWrite command");
                         match flash_manager.write_data(packet.address, &packet.data).await {
                             Ok(_) => {
-                                defmt::info!("StreamWrite: Successfully wrote {} bytes at 0x{:08X}", packet.data.len(), packet.address);
+                                defmt::info!(
+                                    "StreamWrite: Successfully wrote {} bytes at 0x{:08X}",
+                                    packet.data.len(),
+                                    packet.address
+                                );
                                 Response::new(Status::Success, Vec::new())
                             }
                             Err(_) => {
-                                defmt::error!("StreamWrite: Failed to write data at 0x{:08X}", packet.address);
+                                defmt::error!(
+                                    "StreamWrite: Failed to write data at 0x{:08X}",
+                                    packet.address
+                                );
                                 Response::new(Status::FlashError, Vec::new())
                             }
                         }
@@ -387,13 +420,21 @@ async fn protocol_handler_loop<'a>(
                     let chunk = &response_data[sent..chunk_end];
                     cdc_class.write_packet(chunk).await?;
                     sent = chunk_end;
-                    defmt::debug!("Protocol: Sent chunk {} bytes, total sent: {}", chunk.len(), sent);
+                    defmt::debug!(
+                        "Protocol: Sent chunk {} bytes, total sent: {}",
+                        chunk.len(),
+                        sent
+                    );
                 }
                 defmt::info!("Protocol: Response sent successfully");
 
                 // Memory management: shrink buffer if it's getting large
                 if packet_buffer.capacity() > 2048 && packet_buffer.len() < 512 {
-                    defmt::debug!("Memory: Shrinking buffer from capacity {} to {}", packet_buffer.capacity(), packet_buffer.len());
+                    defmt::debug!(
+                        "Memory: Shrinking buffer from capacity {} to {}",
+                        packet_buffer.capacity(),
+                        packet_buffer.len()
+                    );
                     packet_buffer.shrink_to_fit();
                 }
 
@@ -406,7 +447,10 @@ async fn protocol_handler_loop<'a>(
 fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
     // Need at least minimum packet size (17 bytes: magic(2) + command(1) + length(4) + address(4) + sequence(2) + CRC(4))
     if buffer.len() < 17 {
-        defmt::debug!("Parse: Buffer too small ({} bytes), need at least 17", buffer.len());
+        defmt::debug!(
+            "Parse: Buffer too small ({} bytes), need at least 17",
+            buffer.len()
+        );
         return None;
     }
 
@@ -416,7 +460,7 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
     // Find magic number in buffer
     let mut magic_pos = None;
     for i in 0..=buffer.len().saturating_sub(2) {
-        if buffer[i..i+2] == magic_bytes {
+        if buffer[i..i + 2] == magic_bytes {
             magic_pos = Some(i);
             break;
         }
@@ -453,8 +497,14 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
     let address = u32::from_le_bytes([buffer[7], buffer[8], buffer[9], buffer[10]]);
     let sequence = u16::from_le_bytes([buffer[11], buffer[12]]);
 
-    defmt::debug!("Parse: Magic: 0x{:08x}, Seq: {}, Cmd: {}, Addr: 0x{:08x}, Len: {}",
-                 magic, sequence, command_byte, address, length);
+    defmt::debug!(
+        "Parse: Magic: 0x{:08x}, Seq: {}, Cmd: {}, Addr: 0x{:08x}, Len: {}",
+        magic,
+        sequence,
+        command_byte,
+        address,
+        length
+    );
 
     // Validate magic number
     if magic != 0xABCD {
@@ -496,7 +546,11 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
 
     // Check if we have the complete packet
     if buffer.len() < total_size {
-        defmt::debug!("Parse: Incomplete packet: have {} bytes, need {}", buffer.len(), total_size);
+        defmt::debug!(
+            "Parse: Incomplete packet: have {} bytes, need {}",
+            buffer.len(),
+            total_size
+        );
         return None;
     }
 
@@ -529,7 +583,7 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
             buffer[crc_start],
             buffer[crc_start + 1],
             buffer[crc_start + 2],
-            buffer[crc_start + 3]
+            buffer[crc_start + 3],
         ])
     } else {
         0 // No CRC available
@@ -541,8 +595,11 @@ fn try_parse_packet(buffer: &mut Vec<u8>) -> Option<Packet> {
     // Remove the parsed packet from buffer
     buffer.drain(0..total_size);
 
-    defmt::info!("Parse: Successfully parsed packet - Addr: 0x{:08x}, Len: {}",
-                address, length);
+    defmt::info!(
+        "Parse: Successfully parsed packet - Addr: 0x{:08x}, Len: {}",
+        address,
+        length
+    );
 
     Some(Packet {
         magic,

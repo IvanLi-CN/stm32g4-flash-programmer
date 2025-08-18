@@ -29,25 +29,25 @@ impl ImageParser {
             format: ImageFormat::Rgb565,
         }
     }
-    
+
     /// Convert raw RGB565 data to pixel color
     pub fn rgb565_to_color(data: &[u8], pixel_index: usize) -> Result<Rgb565, &'static str> {
         let byte_index = pixel_index * 2;
-        
+
         if data.len() < byte_index + 2 {
             return Err("Insufficient data for pixel");
         }
-        
+
         // RGB565 is stored in little-endian format
         let rgb565_value = u16::from_le_bytes([data[byte_index], data[byte_index + 1]]);
-        
+
         Ok(Rgb565::new(
             ((rgb565_value >> 11) & 0x1F) as u8,  // Red (5 bits)
             ((rgb565_value >> 5) & 0x3F) as u8,   // Green (6 bits)
             (rgb565_value & 0x1F) as u8,          // Blue (5 bits)
         ))
     }
-    
+
     /// Get pixel color at specific coordinates
     pub fn get_pixel_at(
         data: &[u8],
@@ -58,11 +58,11 @@ impl ImageParser {
         if x >= info.width || y >= info.height {
             return Err("Coordinates out of bounds");
         }
-        
+
         let pixel_index = (y as usize * info.width as usize + x as usize);
         Self::rgb565_to_color(data, pixel_index)
     }
-    
+
     /// Extract a rectangular region from the image
     pub fn extract_region(
         data: &[u8],
@@ -75,29 +75,29 @@ impl ImageParser {
         if start_x + width > info.width || start_y + height > info.height {
             return Err("Region out of bounds");
         }
-        
+
         let mut pixels = heapless::Vec::new();
-        
+
         for y in start_y..(start_y + height) {
             for x in start_x..(start_x + width) {
                 let color = Self::get_pixel_at(data, info, x, y)?;
                 pixels.push(color).map_err(|_| "Pixel buffer full")?;
             }
         }
-        
+
         Ok(pixels)
     }
-    
+
     /// Calculate image statistics
     pub fn calculate_stats(data: &[u8], info: &ImageInfo) -> ImageStats {
         let total_pixels = info.width as u32 * info.height as u32;
         let expected_size = total_pixels * 2; // 2 bytes per RGB565 pixel
-        
+
         let mut red_sum = 0u32;
         let mut green_sum = 0u32;
         let mut blue_sum = 0u32;
         let mut valid_pixels = 0u32;
-        
+
         // Sample every 16th pixel for performance
         for i in (0..total_pixels).step_by(16) {
             if let Ok(color) = Self::rgb565_to_color(data, i as usize) {
@@ -107,7 +107,7 @@ impl ImageParser {
                 valid_pixels += 1;
             }
         }
-        
+
         ImageStats {
             width: info.width,
             height: info.height,
@@ -120,7 +120,7 @@ impl ImageParser {
             sampled_pixels: valid_pixels,
         }
     }
-    
+
     /// Generate ASCII art preview of the image
     pub fn generate_ascii_preview(
         data: &[u8],
@@ -129,15 +129,15 @@ impl ImageParser {
         preview_height: u16
     ) -> Result<heapless::String<1024>, &'static str> {
         let mut preview = heapless::String::new();
-        
+
         let x_step = info.width / preview_width;
         let y_step = info.height / preview_height;
-        
+
         for y in 0..preview_height {
             for x in 0..preview_width {
                 let sample_x = x * x_step;
                 let sample_y = y * y_step;
-                
+
                 if let Ok(color) = Self::get_pixel_at(data, info, sample_x, sample_y) {
                     // Convert to grayscale and map to ASCII characters
                     let gray = (color.r() as u16 + color.g() as u16 + color.b() as u16) / 3;
@@ -155,7 +155,7 @@ impl ImageParser {
             }
             preview.push('\n').map_err(|_| "Preview buffer full")?;
         }
-        
+
         Ok(preview)
     }
 }

@@ -37,7 +37,33 @@ flash-content-generator/
 
 ## Quick Start
 
-### 1. Font Generation
+### One-Command Generation (Recommended)
+
+Generate complete Flash firmware with automatic web deployment:
+
+```bash
+python3 generate_firmware.py
+```
+
+This single command will:
+
+1. Convert TTF fonts to bitmap format (12px + 16px)
+2. Generate RGB565 boot screen from SVG
+3. Compose complete 16MB Flash image
+4. Automatically deploy to web-app for preview
+5. Verify Flash image integrity
+
+**Output:**
+
+- `w25q128jv_complete.bin` - Complete 16MB Flash image
+- `web-app/w25q128jv_complete.bin` - Copy for web preview
+- Detailed generation log and verification report
+
+### Manual Step-by-Step Generation
+
+For advanced users who want granular control:
+
+#### 1. Font Generation
 
 Convert a TTF font to bitmap format:
 
@@ -46,7 +72,7 @@ cd tools
 python font_converter.py ../assets/VonwaonBitmap-12px.ttf --output ../assets/font_output/
 ```
 
-### 2. Boot Screen Generation
+#### 2. Boot Screen Generation
 
 Convert SVG to RGB565 format:
 
@@ -54,23 +80,30 @@ Convert SVG to RGB565 format:
 python svg_to_rgb565.py ../assets/boot_screen.svg --output ../assets/boot_screen_320x172.bin --width 320 --height 172
 ```
 
-### 3. Flash Image Composition
+#### 3. Flash Image Composition
 
-Create complete Flash image:
+Create complete Flash image (automatically copies to web-app for preview):
 
 ```bash
-python flash_composer.py --config ../assets/resource_layout.json --output flash_image.bin
+python flash_composer.py
 ```
 
-### 4. Web-based Font Analysis
+### Web-based Flash Content Preview
 
-Open the web-app in a browser:
+The web app automatically loads the generated firmware for preview:
 
 ```bash
 cd web-app
 # Open index.html in your browser
-# Upload .bin font files to analyze and view characters
+# The generated firmware is automatically loaded
+# Switch between Flash firmware, Font resources, and Image resources
 ```
+
+**Features:**
+
+- **Flash Firmware**: View memory layout and resource blocks
+- **Font Resources**: Browse 12px/16px fonts with 27,678+ characters
+- **Image Resources**: Preview RGB565 boot screen (320×172)
 
 ## Tools Description
 
@@ -93,6 +126,7 @@ Composes complete Flash images from multiple resources:
 - Boot screen images
 - Configuration data
 - Memory layout management
+- **Automatic web-app deployment** (copies firmware for preview)
 
 ### resource_manager.py
 Manages Flash memory layout and resource allocation:

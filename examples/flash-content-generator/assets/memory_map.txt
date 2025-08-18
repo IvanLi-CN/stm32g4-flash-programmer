@@ -16,11 +16,17 @@ Resource: boot_screen
   Sectors: 0-26
   Description: 320x172 RGB565 boot screen bitmap
 
-Resource: font_bitmap
-  Address: 0x00020000 - 0x0021FFFF
-  Size: 2,097,152 bytes
-  Sectors: 32-543
-  Description: WenQuanYi 12px bitmap font data (Chinese + ASCII)
+Resource: font_bitmap_12px
+  Address: 0x00020000 - 0x0011FFFF
+  Size: 1,048,576 bytes
+  Sectors: 32-287
+  Description: VonwaonBitmap 12px bitmap font data (Chinese + ASCII)
+
+Resource: font_bitmap_16px
+  Address: 0x00120000 - 0x0021FFFF
+  Size: 1,048,576 bytes
+  Sectors: 288-543
+  Description: VonwaonBitmap 16px bitmap font data (Chinese + ASCII)
 
 Resource: ui_graphics
   Address: 0x00220000 - 0x0041FFFF
@@ -64,6 +70,12 @@ Flash Programming Commands:
 # Program boot_screen
 st-flash write boot_screen_320x172.bin 0x00000000
 
-# Program font_bitmap
-st-flash write font_output/font_bitmap.bin 0x00020000
+# Program 12px font_bitmap
+st-flash write font_output/font_bitmap_12px.bin 0x00020000
+
+# Program 16px font_bitmap
+st-flash write font_output/font_bitmap_16px.bin 0x00120000
+
+# Program complete flash image (recommended)
+st-flash write w25q128jv_complete.bin 0x00000000
 

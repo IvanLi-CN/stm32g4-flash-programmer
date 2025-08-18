@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import struct
+import shutil
 
 class FlashComposer:
     """Compose complete flash image for W25Q128JV"""
@@ -75,15 +76,16 @@ class FlashComposer:
             address = resource['address']
             
             # Skip empty/reserved areas
-            if name in ['ui_graphics', 'app_data', 'user_config', 'log_storage', 
+            if name in ['ui_graphics', 'app_data', 'user_config', 'log_storage',
                        'firmware_update', 'reserved']:
                 print(f"⏭️  Skipping {name} (empty area)")
                 continue
-            
+
             # Map resource names to files
             file_mapping = {
                 'boot_screen': 'boot_screen_320x172.bin',
-                'font_bitmap': 'font_output/font_bitmap.bin'
+                'font_bitmap_12px': 'font_output/font_bitmap_12px.bin',
+                'font_bitmap_16px': 'font_output/font_bitmap_16px.bin'
             }
             
             if name in file_mapping:
@@ -134,15 +136,25 @@ class FlashComposer:
             else:
                 print("✅ Boot screen data present")
             
-            # Check font data
-            f.seek(0x00020000)  # Font address
-            font_header = f.read(4)
-            if len(font_header) == 4:
-                char_count = struct.unpack('<I', font_header)[0]
-                if char_count == 2094:
-                    print("✅ Font data verified (2094 characters)")
+            # Check 12px font data
+            f.seek(0x00020000)  # 12px Font address
+            font_header_12px = f.read(4)
+            if len(font_header_12px) == 4:
+                char_count_12px = struct.unpack('<I', font_header_12px)[0]
+                if char_count_12px == 27678:
+                    print("✅ 12px Font data verified (27678 characters)")
                 else:
-                    print(f"⚠️  Font character count: {char_count} (expected 2094)")
+                    print(f"⚠️  12px Font character count: {char_count_12px} (expected 27678)")
+
+            # Check 16px font data
+            f.seek(0x00120000)  # 16px Font address
+            font_header_16px = f.read(4)
+            if len(font_header_16px) == 4:
+                char_count_16px = struct.unpack('<I', font_header_16px)[0]
+                if char_count_16px == 27678:
+                    print("✅ 16px Font data verified (27678 characters)")
+                else:
+                    print(f"⚠️  16px Font character count: {char_count_16px} (expected 27678)")
             
             # Check empty areas are 0xFF
             f.seek(0x00220000)  # UI graphics area
@@ -154,7 +166,43 @@ class FlashComposer:
         
         print("✅ Flash image verification complete")
         return True
-    
+
+    def copy_to_webapp(self, source_path):
+        """Copy firmware to web-app directory for preview"""
+        # Get the web-app directory path
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(script_dir)
+        webapp_dir = os.path.join(project_dir, 'web-app')
+
+        if not os.path.exists(webapp_dir):
+            print(f"⚠️  Web-app directory not found: {webapp_dir}")
+            return False
+
+        destination_path = os.path.join(webapp_dir, os.path.basename(source_path))
+
+        try:
+            print(f"📋 Copying firmware to web-app directory...")
+            shutil.copy2(source_path, destination_path)
+
+            # Verify copy
+            if os.path.exists(destination_path):
+                dest_size = os.path.getsize(destination_path)
+                src_size = os.path.getsize(source_path)
+
+                if dest_size == src_size:
+                    print(f"   ✅ Successfully copied to: {destination_path}")
+                    print(f"   📏 Size: {dest_size:,} bytes")
+                    return True
+                else:
+                    print(f"   ❌ Size mismatch: {dest_size} != {src_size}")
+                    return False
+            else:
+                print(f"   ❌ Copy failed: destination file not found")
+                return False
+
+        except Exception as e:
+            print(f"   ❌ Copy failed: {e}")
+            return False
 
 
 def main():
@@ -187,14 +235,22 @@ def main():
     if not composer.verify_flash_image(output_path):
         print("❌ Flash image verification failed")
         return 1
-    
+
+    # Copy to web-app directory for preview
+    print()
+    if composer.copy_to_webapp(output_path):
+        print("✅ Firmware copied to web-app directory")
+    else:
+        print("⚠️  Failed to copy firmware to web-app directory")
+
     print()
     print("🎉 Flash composition complete!")
     print(f"📁 Complete flash image: {output_path}")
     print(f"📏 Size: 16 MB (16,777,216 bytes)")
     print()
     print("💡 Flash image ready for programming with your preferred tool.")
-    
+    print("🌐 Web preview available at: web-app/index.html")
+
     return 0
 
 if __name__ == "__main__":

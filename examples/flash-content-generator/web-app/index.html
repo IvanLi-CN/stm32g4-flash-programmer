@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flash位图字体分析器</title>
+    <title>STM32G4 Flash资源预览器</title>
     <style>
         * {
             margin: 0;
@@ -14,8 +14,9 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            height: 100vh;
             padding: 20px;
+            overflow: hidden;
         }
 
         .container {
@@ -25,6 +26,9 @@
             border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
         }
 
         .header {
@@ -40,21 +44,196 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        .resource-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .tab-btn.active {
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
         }
 
         .main-content {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            min-height: 600px;
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .sidebar {
             background: #f8f9fa;
             border-right: 1px solid #e9ecef;
             padding: 20px;
+            width: 300px;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .content-area {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .details-panel {
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            padding: 16px;
+            height: auto;
+            min-height: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            width: 100%;
+        }
+
+        .details-placeholder {
+            text-align: center;
+            color: #6c757d;
+            padding: 40px 20px;
+        }
+
+        .details-placeholder h3 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .placeholder-icon {
+            font-size: 3em;
+            margin-top: 20px;
+            opacity: 0.5;
+        }
+
+        /* 两栏布局容器 */
+        .character-details-layout {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        /* 左栏：字符预览和缩放控制 */
+        .character-preview-column {
+            flex: 0 0 auto;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .character-preview {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        /* 右栏：字符信息 */
+        .character-info-column {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .character-info {
+            margin: 0 0 15px 0;
+        }
+
+        .character-info .info-item {
+            margin: 8px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .character-info .info-item strong {
+            color: #495057;
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+
+        .character-info .info-item span {
+            color: #212529;
+            font-family: 'Courier New', monospace;
+            text-align: right;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .zoom-btn {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .zoom-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .zoom-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .export-btn {
+            width: 100%;
+            padding: 8px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .export-btn:hover {
+            background: #218838;
         }
 
         .file-upload {
@@ -82,13 +261,34 @@
         }
 
         .file-input {
-            display: none;
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
         }
 
         .upload-icon {
             font-size: 3em;
             color: #007bff;
             margin-bottom: 15px;
+        }
+
+        .upload-btn {
+            padding: 10px 20px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        .upload-btn:hover {
+            background: #0056b3;
         }
 
         .font-info {
@@ -109,6 +309,70 @@
             justify-content: space-between;
             margin-bottom: 5px;
             font-size: 0.9em;
+        }
+
+        .font-selector {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .font-selector h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .font-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .font-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .font-option:hover {
+            background: #e9ecef;
+        }
+
+        .font-option input[type="radio"] {
+            margin: 0;
+        }
+
+        .font-option label {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .font-comparison {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .comparison-toggle {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s ease;
+        }
+
+        .comparison-toggle:hover {
+            background: #0056b3;
+        }
+
+        .comparison-toggle.active {
+            background: #28a745;
         }
 
         .char-categories {
@@ -139,12 +403,45 @@
             border-color: #007bff;
         }
 
+        .search-container {
+            margin-bottom: 15px;
+        }
+
+        .search-tabs {
+            display: flex;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .search-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: #f8f9fa;
+            color: #666;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .search-tab:hover {
+            background: #e9ecef;
+        }
+
+        .search-tab.active {
+            background: #007bff;
+            color: white;
+        }
+
         .search-box {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 6px;
-            margin-bottom: 15px;
+            font-size: 14px;
+            box-sizing: border-box;
         }
 
         .viewer-area {
@@ -153,21 +450,38 @@
         }
 
         .char-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 15px;
+            display: block !important;
+            height: 100%;
             margin-bottom: 30px;
+        }
+
+        .virtual-grid-container {
+            height: 100%;
+            max-height: calc(100vh - 500px); /* 为更大的详情面板留出空间 */
+            overflow: auto;
+        }
+
+        .virtual-grid-items {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+            gap: 12px !important;
+            padding: 10px;
         }
 
         .char-item {
             background: white;
             border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
+            border-radius: 6px;
+            padding: 10px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80px;
         }
 
         .char-item:hover {
@@ -181,10 +495,22 @@
             background: #f8f9ff;
         }
 
+        .char-canvas-container {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 8px;
+            background: transparent;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-start;
+            position: relative;
+        }
+
         .char-canvas {
-            border: 1px solid #ddd;
-            margin-bottom: 10px;
             image-rendering: pixelated;
+            background: transparent;
+            border: 1px solid #ccc;
+            border-radius: 2px;
         }
 
         .char-info {
@@ -193,9 +519,17 @@
         }
 
         .char-unicode {
+            font-size: 0.7em;
+            color: #007bff;
             font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .char-size {
+            font-size: 0.65em;
+            color: #666;
+            margin-top: 2px;
         }
 
         .detail-view {
@@ -273,19 +607,144 @@
             border: 1px solid #c3e6cb;
         }
 
+        /* RGB565图片预览器样式 */
+        .image-preview {
+            display: none;
+            text-align: center;
+        }
+
+        .image-preview h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .image-canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .image-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .image-info h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        /* Flash固件分析器样式 */
+        .firmware-preview {
+            display: none;
+        }
+
+        .memory-map {
+            margin-bottom: 30px;
+        }
+
+        .memory-blocks {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .memory-block {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .memory-block:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .memory-block.boot-screen {
+            border-left-color: #ff6b6b;
+        }
+
+        .memory-block.font-12px {
+            border-left-color: #4ecdc4;
+        }
+
+        .memory-block.font-16px {
+            border-left-color: #45b7d1;
+        }
+
+        .block-info {
+            flex: 1;
+        }
+
+        .block-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .block-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .preview-containers {
+            display: none;
+        }
+
+        .preview-containers.active {
+            display: block;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
             }
-            
+
             .sidebar {
                 border-right: none;
                 border-bottom: 1px solid #e9ecef;
             }
-            
+
+            .details-panel {
+                max-height: 250px;
+            }
+
+            /* 移动端两栏布局调整 */
+            .character-details-layout {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .character-preview-column {
+                min-width: auto;
+                width: 100%;
+            }
+
+            .character-info-column {
+                width: 100%;
+            }
+
             .char-grid {
-                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-                gap: 10px;
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                gap: 8px;
+                padding: 5px;
+            }
+
+            .char-item {
+                padding: 8px;
+                min-height: 60px;
             }
         }
     </style>
@@ -293,8 +752,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔍 Flash位图字体分析器</h1>
-            <p>STM32G4 W25Q128JV Flash字体数据可视化工具</p>
+            <h1>🔍 STM32G4 Flash资源预览器</h1>
+            <p>W25Q128JV Flash固件资源可视化工具</p>
+
+            <div class="resource-tabs">
+                <button class="tab-btn active" data-type="firmware">💾 Flash固件</button>
+                <button class="tab-btn" data-type="font">🔤 字体资源</button>
+                <button class="tab-btn" data-type="image">🖼️ 图片资源</button>
+            </div>
         </div>
         
         <div class="main-content">
@@ -303,11 +768,30 @@
                     <div class="upload-area" id="uploadArea">
                         <div class="upload-icon">📁</div>
                         <p><strong>点击或拖拽上传</strong></p>
-                        <p>字体位图文件 (.bin)</p>
+                        <p><span id="uploadHint">字体位图文件 (.bin)</span></p>
+                        <button type="button" class="upload-btn" id="uploadBtn">选择文件</button>
                         <input type="file" id="fileInput" class="file-input" accept=".bin">
                     </div>
                 </div>
                 
+                <div class="font-selector" id="fontSelector">
+                    <h4>🔤 字体选择</h4>
+                    <div class="font-options">
+                        <div class="font-option">
+                            <input type="radio" id="font12px" name="fontType" value="12px" checked>
+                            <label for="font12px">12px 字体</label>
+                        </div>
+                        <div class="font-option">
+                            <input type="radio" id="font16px" name="fontType" value="16px">
+                            <label for="font16px">16px 字体</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="font-comparison" id="fontComparison">
+                    <button class="comparison-toggle" id="comparisonToggle">启用字体对比</button>
+                </div>
+
                 <div class="font-info" id="fontInfo" style="display: none;">
                     <h3>📊 字体信息</h3>
                     <div class="info-item">
@@ -333,31 +817,69 @@
                     <button class="category-btn" data-category="symbols">🔣 符号</button>
                 </div>
                 
-                <input type="text" class="search-box" id="searchBox" placeholder="搜索字符或Unicode码点..." style="display: none;">
+                <div class="search-container" id="searchContainer" style="display: none;">
+                    <div class="search-tabs">
+                        <button class="search-tab active" data-mode="char">🔤 字符</button>
+                        <button class="search-tab" data-mode="unicode">🔢 码点</button>
+                    </div>
+                    <input type="text" class="search-box" id="searchBox" placeholder="搜索字符...">
+                </div>
             </div>
             
-            <div class="viewer-area">
+            <div class="content-wrapper">
+                <div class="content-area">
                 <div id="loadingMsg" class="loading">
-                    <h3>👋 欢迎使用Flash位图字体分析器</h3>
-                    <p>请上传从STM32G4 Flash中提取的字体位图文件开始分析</p>
+                    <h3>👋 欢迎使用STM32G4 Flash资源预览器</h3>
+                    <p>请上传Flash资源文件开始分析</p>
                 </div>
-                
+
                 <div id="errorMsg" class="error" style="display: none;"></div>
                 <div id="successMsg" class="success" style="display: none;"></div>
-                
-                <div id="charGrid" class="char-grid" style="display: none;"></div>
-                
-                <div id="detailView" class="detail-view" style="display: none;">
-                    <h3 id="detailTitle">字符详情</h3>
-                    <div class="zoom-controls">
-                        <button class="zoom-btn" data-zoom="1">1x</button>
-                        <button class="zoom-btn active" data-zoom="4">4x</button>
-                        <button class="zoom-btn" data-zoom="8">8x</button>
-                        <button class="zoom-btn" data-zoom="16">16x</button>
+
+                <!-- 字体预览容器 -->
+                <div class="preview-containers active" data-viewer="font">
+                    <div id="charGrid" class="char-grid" style="display: none;"></div>
+                </div>
+
+                <!-- 图片预览容器 -->
+                <div class="preview-containers image-preview" data-viewer="image">
+                    <h3>🖼️ RGB565图片预览</h3>
+                    <canvas id="imageCanvas" class="image-canvas"></canvas>
+                    <div class="image-info" id="imageInfo" style="display: none;">
+                        <h4>📊 图片信息</h4>
+                        <div class="info-item">
+                            <span>尺寸:</span>
+                            <span id="imageDimensions">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span>格式:</span>
+                            <span>RGB565</span>
+                        </div>
+                        <div class="info-item">
+                            <span>文件大小:</span>
+                            <span id="imageFileSize">-</span>
+                        </div>
                     </div>
-                    <canvas id="detailCanvas" class="detail-canvas"></canvas>
-                    <div id="charDetails"></div>
-                    <button class="export-btn" id="exportBtn">导出为PNG</button>
+                </div>
+
+                <!-- Flash固件预览容器 -->
+                <div class="preview-containers firmware-preview" data-viewer="firmware">
+                    <h3>💾 Flash固件分析</h3>
+                    <div class="memory-map">
+                        <h4>📊 内存布局</h4>
+                        <div class="memory-blocks" id="memoryBlocks">
+                            <!-- 内存块将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <div class="details-panel" id="detailsPanel">
+                    <div class="details-placeholder">
+                        <h3>📋 详情面板</h3>
+                        <p>点击字符、图片或内存块查看详细信息</p>
+                        <div class="placeholder-icon">🔍</div>
+                    </div>
                 </div>
             </div>
         </div>

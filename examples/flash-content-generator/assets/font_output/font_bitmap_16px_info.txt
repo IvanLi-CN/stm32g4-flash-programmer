@@ -1,7 +1,7 @@
 WenQuanYi Bitmap Font Information
 =================================
 
-Font Size: 12px
+Font Size: 16px
 Total Characters: 27678
 Format: 1-bit monochrome bitmap
 Encoding: Unicode (UTF-16)
@@ -42,24 +42,24 @@ Sample Characters (Sorted Order):
 =================================
 Char | Unicode | Size  | Bitmap Size
 -----|---------|-------|------------
- '!'  | U+0021  |  8x 9 |   9 bytes
- '"'  | U+0022  |  8x 9 |   9 bytes
- '#'  | U+0023  |  8x 9 |   9 bytes
- '$'  | U+0024  |  8x 9 |   9 bytes
+ '!'  | U+0021  |  8x11 |  11 bytes
+ '"'  | U+0022  |  8x12 |  12 bytes
+ '#'  | U+0023  |  8x10 |  10 bytes
+ '$'  | U+0024  |  8x14 |  14 bytes
  '%'  | U+0025  |  8x 9 |   9 bytes
- '&'  | U+0026  |  8x 7 |   7 bytes
- '''  | U+0027  |  8x 9 |   9 bytes
- '('  | U+0028  |  8x10 |  10 bytes
- ')'  | U+0029  |  8x10 |  10 bytes
- '*'  | U+002A  |  8x 9 |   9 bytes
+ '&'  | U+0026  |  8x11 |  11 bytes
+ '''  | U+0027  |  8x12 |  12 bytes
+ '('  | U+0028  |  8x11 |  11 bytes
+ ')'  | U+0029  |  8x11 |  11 bytes
+ '*'  | U+002A  |  8x 8 |   8 bytes
  '+'  | U+002B  |  8x 8 |   8 bytes
  ','  | U+002C  |  8x 4 |   4 bytes
- '-'  | U+002D  |  8x 5 |   5 bytes
+ '-'  | U+002D  |  8x 6 |   6 bytes
  '.'  | U+002E  |  8x 3 |   3 bytes
  '/'  | U+002F  |  8x 9 |   9 bytes
- '0'  | U+0030  |  8x 9 |   9 bytes
- '1'  | U+0031  |  8x 9 |   9 bytes
- '2'  | U+0032  |  8x 9 |   9 bytes
- '3'  | U+0033  |  8x 9 |   9 bytes
- '4'  | U+0034  |  8x 9 |   9 bytes
+ '0'  | U+0030  |  8x11 |  11 bytes
+ '1'  | U+0031  |  8x11 |  11 bytes
+ '2'  | U+0032  |  8x11 |  11 bytes
+ '3'  | U+0033  |  8x11 |  11 bytes
+ '4'  | U+0034  |  8x11 |  11 bytes
 ... and 27658 more characters

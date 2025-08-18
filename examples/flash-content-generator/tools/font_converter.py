@@ -9,7 +9,7 @@ import sys
 import struct
 from PIL import Image, ImageDraw, ImageFont
 
-def convert_font_to_bitmap(font_path, output_dir, font_size=12):
+def convert_font_to_bitmap(font_path, output_dir, font_size=12, output_filename="font_bitmap.bin"):
     """Convert TTF font to bitmap format for embedded systems"""
     print(f"Converting font: {font_path}")
     print(f"Font size: {font_size}px")
@@ -44,11 +44,12 @@ def convert_font_to_bitmap(font_path, output_dir, font_size=12):
         print(f"✓ Sorted {len(all_char_data)} characters")
 
         # Generate bitmap file
-        bitmap_path = os.path.join(output_dir, 'font_bitmap.bin')
+        bitmap_path = os.path.join(output_dir, output_filename)
         generate_bitmap_file(all_char_data, bitmap_path)
 
         # Generate info file
-        info_path = os.path.join(output_dir, 'font_info.txt')
+        info_filename = output_filename.replace('.bin', '_info.txt')
+        info_path = os.path.join(output_dir, info_filename)
         generate_bitmap_info(all_char_data, info_path, font_size, total_chars)
 
         print(f"\n✓ Font conversion complete!")
@@ -66,7 +67,7 @@ def extract_character_range(font, font_path, font_size, start_code, end_code, ra
     """Extract character bitmaps from a Unicode range"""
     char_data = []
 
-    for char_code in range(start_code, min(end_code + 1, start_code + 1000)):  # Limit to prevent huge files
+    for char_code in range(start_code, end_code + 1):  # Generate all characters in range
         try:
             char = chr(char_code)
 
@@ -270,28 +271,52 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     assets_dir = os.path.join(os.path.dirname(script_dir), 'assets')
 
-    # Font paths
-    font_path = os.path.join(assets_dir, 'WenQuanYi.Bitmap.Song.12px.ttf')
+    # Font paths for both 12px and 16px fonts
+    font_12px_path = os.path.join(assets_dir, 'VonwaonBitmap-12px.ttf')
+    font_16px_path = os.path.join(assets_dir, 'VonwaonBitmap-16px.ttf')
     output_dir = os.path.join(assets_dir, 'font_output')
 
     print("=== Font Bitmap Converter ===")
-    print(f"Input font: {font_path}")
+    print("Converting both 12px and 16px fonts...")
     print(f"Output directory: {output_dir}")
 
-    # Check if font exists
-    if not os.path.exists(font_path):
-        print(f"Error: Font file not found: {font_path}")
+    # Check if both fonts exist
+    if not os.path.exists(font_12px_path):
+        print(f"Error: 12px font file not found: {font_12px_path}")
         return 1
 
-    # Convert font to bitmap
-    # 使用VonwaonBitmap-12px.ttf字体
-    vonwaon_font_path = "../assets/VonwaonBitmap-12px.ttf"
-    if convert_font_to_bitmap(vonwaon_font_path, output_dir, font_size=12):
-        print("\n=== Font Conversion Complete ===")
-        print("Bitmap font is ready for flash programming.")
-        print("Use the address from memory_map.txt for programming.")
+    if not os.path.exists(font_16px_path):
+        print(f"Error: 16px font file not found: {font_16px_path}")
+        return 1
+
+    success_count = 0
+
+    # Convert 12px font
+    print(f"\n🔤 Converting 12px font: {font_12px_path}")
+    if convert_font_to_bitmap(font_12px_path, output_dir, font_size=12, output_filename="font_bitmap_12px.bin"):
+        print("✅ 12px font conversion completed successfully!")
+        success_count += 1
+    else:
+        print("❌ 12px font conversion failed!")
+
+    # Convert 16px font
+    print(f"\n🔤 Converting 16px font: {font_16px_path}")
+    if convert_font_to_bitmap(font_16px_path, output_dir, font_size=16, output_filename="font_bitmap_16px.bin"):
+        print("✅ 16px font conversion completed successfully!")
+        success_count += 1
+    else:
+        print("❌ 16px font conversion failed!")
+
+    print(f"\n📊 Conversion Summary:")
+    print(f"   Fonts converted: {success_count}/2")
+
+    if success_count == 2:
+        print("🎉 All font conversions completed successfully!")
+        print("Bitmap fonts are ready for flash programming.")
+        print("Use the addresses from memory_map.txt for programming.")
         return 0
     else:
+        print("⚠️  Some font conversions failed!")
         return 1
 
 if __name__ == "__main__":

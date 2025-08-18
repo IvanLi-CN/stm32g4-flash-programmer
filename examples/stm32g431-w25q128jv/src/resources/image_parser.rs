@@ -59,7 +59,7 @@ impl ImageParser {
             return Err("Coordinates out of bounds");
         }
 
-        let pixel_index = (y as usize * info.width as usize + x as usize);
+        let pixel_index = y as usize * info.width as usize + x as usize;
         Self::rgb565_to_color(data, pixel_index)
     }
 

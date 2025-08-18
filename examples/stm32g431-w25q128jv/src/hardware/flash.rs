@@ -130,7 +130,7 @@ impl FlashManager {
                 defmt::debug!("Cache miss at address 0x{:08X}, reading from SPI Flash", current_address);
 
                 // Read a larger chunk (256 bytes) to improve cache efficiency
-                let chunk_size = core::cmp::min(256, remaining_length);
+                let _chunk_size = core::cmp::min(256, remaining_length);
                 let chunk_address = current_address & !0xFF; // Align to 256-byte boundary
 
                 match self.read_from_spi(chunk_address, 256).await {
@@ -235,9 +235,14 @@ impl FlashManager {
 
     /// Simple, memory-safe Flash read for font data (using same method as firmware)
     pub async fn read_data_simple(&mut self, address: u32, length: usize) -> Result<heapless::Vec<u8, 64>, &'static str> {
+        defmt::info!("🔍 DEBUG: read_data_simple called with addr=0x{:08X}, len={}", address, length);
+
         if let Some(ref mut spi_device) = self.spi_device {
+            defmt::info!("🔍 DEBUG: SPI device is available");
+
             // Limit read size to prevent memory issues
             let safe_length = length.min(64);
+            defmt::info!("🔍 DEBUG: safe_length = {}", safe_length);
 
             // Read command: 0x03 (Read Data) - same as firmware
             let cmd_buf = [
@@ -251,8 +256,55 @@ impl FlashManager {
             defmt::debug!("📤 SPI CMD: {:?}", cmd_buf);
 
             // Create exact-size buffer like firmware does
+            defmt::info!("🔍 DEBUG: Creating read_buf with safe_length = {}", safe_length);
             let mut read_buf = heapless::Vec::<u8, 64>::new();
             read_buf.resize(safe_length, 0).map_err(|_| "Buffer resize failed")?;
+            defmt::info!("🔍 DEBUG: read_buf created successfully, len = {}", read_buf.len());
+
+            // Use the SAME transaction method as firmware
+            defmt::info!("🔍 DEBUG: About to perform SPI transaction");
+            match spi_device.transaction(&mut [
+                embedded_hal_async::spi::Operation::Write(&cmd_buf),
+                embedded_hal_async::spi::Operation::Read(&mut read_buf),  // Direct buffer, no slicing
+            ]).await {
+                Ok(_) => {
+                    defmt::info!("🔍 DEBUG: SPI transaction completed successfully");
+                    defmt::debug!("📥 SPI Data: {:?}", &read_buf[..read_buf.len().min(8)]);
+                    defmt::debug!("✅ Result: {:?}", &read_buf[..read_buf.len().min(8)]);
+                    defmt::info!("🔍 DEBUG: read_data_simple returning Ok");
+                    Ok(read_buf)
+                },
+                Err(_) => {
+                    defmt::info!("🔍 DEBUG: SPI transaction failed");
+                    defmt::error!("❌ SPI transaction failed for simple read at 0x{:08X}", address);
+                    Err("SPI transaction failed")
+                }
+            }
+        } else {
+            Err("SPI device not initialized")
+        }
+    }
+
+    /// Large Flash read for boot screen data (up to 2048 bytes)
+    pub async fn read_data_large(&mut self, address: u32, length: usize) -> Result<heapless::Vec<u8, 2048>, &'static str> {
+        if let Some(ref mut spi_device) = self.spi_device {
+            // Limit read size to prevent memory issues
+            let safe_length = length.min(2048);
+
+            // Read command: 0x03 (Read Data) - same as firmware
+            let cmd_buf = [
+                0x03, // CMD_READ_DATA
+                (address >> 16) as u8,
+                (address >> 8) as u8,
+                address as u8,
+            ];
+
+            defmt::debug!("🔍 SPI Large Read: addr=0x{:08X}, len={}", address, safe_length);
+            defmt::debug!("📤 SPI CMD: {:?}", cmd_buf);
+
+            // Create larger buffer for boot screen data
+            let mut read_buf = heapless::Vec::<u8, 2048>::new();
+            read_buf.resize(safe_length, 0).map_err(|_| "Large buffer resize failed")?;
 
             // Use the SAME transaction method as firmware
             match spi_device.transaction(&mut [
@@ -260,13 +312,13 @@ impl FlashManager {
                 embedded_hal_async::spi::Operation::Read(&mut read_buf),  // Direct buffer, no slicing
             ]).await {
                 Ok(_) => {
-                    defmt::debug!("📥 SPI Data: {:?}", &read_buf[..read_buf.len().min(8)]);
-                    defmt::debug!("✅ Result: {:?}", &read_buf[..read_buf.len().min(8)]);
+                    defmt::debug!("📥 SPI Large Data: {:?}", &read_buf[..8.min(read_buf.len())]);
+                    defmt::debug!("✅ Large Result: {} bytes read", read_buf.len());
                     Ok(read_buf)
-                },
+                }
                 Err(_) => {
-                    defmt::error!("❌ SPI transaction failed for simple read at 0x{:08X}", address);
-                    Err("SPI transaction failed")
+                    defmt::error!("❌ SPI large read transaction failed");
+                    Err("SPI large read failed")
                 }
             }
         } else {

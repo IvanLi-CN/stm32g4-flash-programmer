@@ -38,6 +38,9 @@ module.exports = {
     // Footer rules (optional)
     'footer-leading-blank': [1, 'always'],
     'footer-max-line-length': [2, 'always', 100],
+
+    // Custom English-only rule
+    'english-only': [2, 'always'],
   },
 
   // Custom plugin for English-only validation

@@ -42,7 +42,7 @@ pre-commit:
       glob: "*.{rs,md,yml,yaml,toml}"
       run: |
         echo "🧹 Checking for trailing whitespace..."
-        if grep -r '[[:space:]]$' --include="*.rs" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.toml" .; then
+        if grep -r '[[:space:]]$' --include="*.rs" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.toml" --exclude-dir=node_modules --exclude-dir=target .; then
           echo "❌ Found trailing whitespace. Please remove it."
           exit 1
         fi

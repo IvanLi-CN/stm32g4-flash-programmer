@@ -184,7 +184,7 @@ jobs:
           cargo install cargo-binutils
           rustup component add llvm-tools-preview
           cd host-tool && cargo size --release --bin flash-programmer-tool
-          cd ../firmware && cargo size --target thumbv7em-none-eabihf --release --bin firmware
+          cd ../firmware && cargo size --target thumbv7em-none-eabihf --release --bin stm32g4-flash-programmer
 
   commit-check:
     name: Commit Convention Check

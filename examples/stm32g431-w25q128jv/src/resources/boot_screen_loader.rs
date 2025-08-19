@@ -8,6 +8,9 @@ pub trait DisplayTrait {
 
     async fn fill_screen(&mut self, color: Rgb565) -> Result<(), Self::Error>;
     async fn fill_rect(&mut self, x: u16, y: u16, width: u16, height: u16, color: Rgb565) -> Result<(), Self::Error>;
+
+    /// Draw single pixel
+    async fn draw_pixel(&mut self, x: u16, y: u16, color: Rgb565) -> Result<(), Self::Error>;
 }
 
 /// 开屏图加载器
@@ -90,20 +93,17 @@ impl BootScreenLoader {
         let pixels_in_chunk = data_size / 2;
         let total_pixels_before = (chunk_index * self.chunk_size) / 2;
 
-        // 计算起始位置
+        // 计算起始位置 - 按行主序排列
         let start_x = (total_pixels_before % (self.screen_width as usize)) as u16;
         let start_y = (total_pixels_before / (self.screen_width as usize)) as u16;
 
-        // 计算块的宽度和高度
-        let remaining_pixels_in_row = self.screen_width - start_x;
-        let width = core::cmp::min(pixels_in_chunk, remaining_pixels_in_row as usize) as u16;
+        // 简化处理：每个块都按线性像素序列处理，不强制矩形
+        // 这样可以避免复杂的跨行计算错误
+        let width = self.screen_width;  // 使用全屏宽度
+        let height = 1;                 // 每次处理一个像素序列
 
-        // 简化：假设每个块都是矩形区域
-        let height = if pixels_in_chunk <= remaining_pixels_in_row as usize {
-            1
-        } else {
-            ((pixels_in_chunk - remaining_pixels_in_row as usize) / self.screen_width as usize + 1) as u16
-        };
+        defmt::debug!("Chunk {}: offset=0x{:X}, size={}, pixels={}, start=({},{})",
+                     chunk_index, data_offset, data_size, pixels_in_chunk, start_x, start_y);
 
         Ok(ImageChunk {
             chunk_index,
@@ -231,7 +231,7 @@ impl BootScreenLoader {
         Ok(())
     }
 
-    /// 显示单个图像块
+    /// 显示单个图像块 (线性像素序列渲染)
     async fn display_chunk<D>(
         &self,
         display: &mut D,
@@ -241,30 +241,29 @@ impl BootScreenLoader {
     where
         D: DisplayTrait,
     {
-        defmt::trace!("🎨 Displaying chunk {} at ({}, {}) size {}x{}",
-                     chunk_info.chunk_index, chunk_info.start_x, chunk_info.start_y,
-                     chunk_info.width, chunk_info.height);
+        defmt::trace!("🎨 Displaying chunk {} with {} pixels starting from offset 0x{:X}",
+                     chunk_info.chunk_index, pixels.len(), chunk_info.data_offset);
 
-        // 使用chunk_info中已经计算好的正确位置信息
-        let mut current_x = chunk_info.start_x;
-        let mut current_y = chunk_info.start_y;
+        // 计算起始像素位置（基于数据偏移）
+        let total_pixels_before = (chunk_info.data_offset / 2) as usize;
 
-        for &pixel in pixels.iter() {
+        // 按行主序渲染像素
+        for (i, &pixel_color) in pixels.iter().enumerate() {
+            let absolute_pixel_index = total_pixels_before + i;
+
+            // 计算屏幕坐标（行主序：从左到右，从上到下）
+            let pixel_x = (absolute_pixel_index % (self.screen_width as usize)) as u16;
+            let pixel_y = (absolute_pixel_index / (self.screen_width as usize)) as u16;
+
             // 确保坐标在屏幕范围内
-            if current_x < self.screen_width && current_y < self.screen_height {
-                display.fill_rect(current_x, current_y, 1, 1, pixel)
+            if pixel_x < self.screen_width && pixel_y < self.screen_height {
+                display.draw_pixel(pixel_x, pixel_y, pixel_color)
                     .await.map_err(|_| "Failed to draw pixel")?;
-            }
-
-            // 移动到下一个像素位置
-            current_x += 1;
-            if current_x >= self.screen_width {
-                current_x = 0;
-                current_y += 1;
             }
         }
 
-        defmt::debug!("✅ Chunk {} rendered: {} pixels", chunk_info.chunk_index, pixels.len());
+        defmt::debug!("✅ Chunk {} rendered: {} pixels from offset 0x{:X}",
+                     chunk_info.chunk_index, pixels.len(), chunk_info.data_offset);
 
         Ok(())
     }

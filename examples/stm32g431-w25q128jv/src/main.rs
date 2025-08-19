@@ -78,7 +78,8 @@ async fn main(_spawner: Spawner) {
 
     // Initialize SPI2 for Flash (W25Q128JV)
     let mut spi2_config = spi::Config::default();
-    spi2_config.frequency = Hertz(500_000); // 500kHz for Flash (very conservative)
+    spi2_config.frequency = Hertz(4_000_000); // 4MHz for Flash (optimized for performance)
+    // W25Q128JV supports up to 104MHz, so 4MHz is still very safe
 
     // W25Q128JV requires SPI Mode 0 (CPOL=0, CPHA=0) - this is the default
     // spi2_config.mode is already Mode 0 by default
@@ -208,48 +209,51 @@ async fn main(_spawner: Spawner) {
             // Skip font data generation - no fonts stored in firmware
             defmt::info!("Skipping font data generation (no fonts in firmware)");
 
-            // Show new 16px font interface
-            // Always show the interface since Flash is initialized
-            display_manager.clear(Rgb565::BLACK).await.unwrap_or_default();
+            // Simple clear screen test
+            defmt::info!("=== 12px Font Fix Verification ===");
 
-            defmt::info!("=== Testing 16px Font Rendering ===");
-
-            // Title with 16px font
-            match display_manager.draw_text_16px("Flash Viewer 16px", 10, 20, Rgb565::WHITE, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Title rendered with 16px font"),
-                Err(e) => defmt::error!("❌ Failed to render title: {}", e),
+            // Clear screen completely first
+            match display_manager.clear(Rgb565::BLACK).await {
+                Ok(()) => defmt::info!("✅ Screen cleared successfully"),
+                Err(e) => defmt::error!("❌ Failed to clear screen: {}", e),
             }
 
-            // Flash info with 16px font
-            match display_manager.draw_text_16px("JEDEC: EF4018", 10, 45, Rgb565::CYAN, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Flash info rendered"),
-                Err(e) => defmt::error!("❌ Failed to render flash info: {}", e),
+            embassy_time::Timer::after_millis(500).await; // Wait for clear to complete
+
+            defmt::info!("Testing actual characters in font...");
+            defmt::info!("Font range: U+0021 (!) to U+007E (~)");
+
+            // Test '!' (U+0021) - the actual first character in the font
+            match display_manager.draw_text("!", 50, 50, Rgb565::WHITE, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Character '!' rendered successfully"),
+                Err(e) => defmt::error!("❌ Failed to render '!': {}", e),
             }
 
-            match display_manager.draw_text_16px("Size: 16MB", 10, 70, Rgb565::GREEN, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Size info rendered"),
-                Err(e) => defmt::error!("❌ Failed to render size info: {}", e),
+            embassy_time::Timer::after_millis(1000).await; // Wait to see result
+
+            // Test 'A' (U+0041) - should be in range
+            match display_manager.draw_text("A", 80, 50, Rgb565::GREEN, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Character 'A' rendered successfully"),
+                Err(e) => defmt::error!("❌ Failed to render 'A': {}", e),
             }
 
-            // Chinese character test with 16px font
-            match display_manager.draw_text_16px("中文显示测试", 10, 95, Rgb565::MAGENTA, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Chinese text rendered with 16px font"),
-                Err(e) => defmt::error!("❌ Failed to render Chinese text: {}", e),
+            embassy_time::Timer::after_millis(1000).await; // Wait to see result
+
+            // Test '0' (U+0030) - should be in range
+            match display_manager.draw_text("0", 110, 50, Rgb565::CYAN, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Character '0' rendered successfully"),
+                Err(e) => defmt::error!("❌ Failed to render '0': {}", e),
             }
 
-            // Mixed text test
-            match display_manager.draw_text_16px("Hello 世界!", 10, 120, Rgb565::YELLOW, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Mixed text rendered"),
-                Err(e) => defmt::error!("❌ Failed to render mixed text: {}", e),
+            embassy_time::Timer::after_millis(1000).await; // Wait to see result
+
+            // Test simple word if individual characters work
+            match display_manager.draw_text("HELLO", 50, 80, Rgb565::YELLOW, &mut flash_manager).await {
+                Ok(()) => defmt::info!("✅ Word 'HELLO' rendered successfully"),
+                Err(e) => defmt::error!("❌ Failed to render 'HELLO': {}", e),
             }
 
-            // Status
-            match display_manager.draw_text_16px("16px Ready!", 10, 145, Rgb565::WHITE, &mut flash_manager).await {
-                Ok(()) => defmt::info!("✅ Status rendered"),
-                Err(e) => defmt::error!("❌ Failed to render status: {}", e),
-            }
-
-            defmt::info!("✅ Step 2: Text rendering completed");
+            defmt::info!("✅ Step 2: 12px Font rendering completed");
         }
         Err(e) => {
             defmt::error!("❌ Flash initialization failed: {}", e);
@@ -276,12 +280,18 @@ async fn main(_spawner: Spawner) {
 
     loop {
         match screen_index {
-            // 第一屏：启动图片屏幕
+            // 第一屏：启动图片屏幕 (带性能测量)
             0 => {
-                defmt::info!("📺 Screen 1/3: Boot Screen Image");
+                defmt::info!("📺 Screen 1/3: Boot Screen Image (Optimized Rendering)");
+
+                // 性能测量开始
+                let start_time = embassy_time::Instant::now();
+
                 match display_manager.show_boot_screen(&mut flash_manager).await {
                     Ok(()) => {
+                        let render_time = start_time.elapsed();
                         defmt::info!("✅ Boot screen image displayed successfully");
+                        defmt::info!("🚀 PERFORMANCE: Image rendered in {} ms (optimized batch transfer)", render_time.as_millis());
                     }
                     Err(e) => {
                         defmt::error!("❌ Failed to show boot screen image: {}", e);

@@ -11,6 +11,7 @@ probe-rs run --chip STM32G431CBUx target/thumbv7em-none-eabihf/release/stm32g4-f
 ```
 
 **验证结果：**
+
 - ✅ STM32G431初始化成功
 - ✅ 外部Flash (W25Q128JV) 初始化成功
 - ✅ USB连接建立
@@ -28,6 +29,7 @@ cd /Users/ivan/Projects/Ivan/stm32g4-flash-programmer/host-tool
 ```
 
 **注意事项：**
+
 - 擦除16MB Flash需要很长时间（可能10-30分钟）
 - 需要足够的超时时间
 - 可能需要多次尝试
@@ -103,11 +105,12 @@ ls /dev/cu.usbmodem*
 烧录完成后，执行以下步骤：
 
 1. **烧录应用固件：**
-```bash
-cd /Users/ivan/Projects/Ivan/stm32g4-flash-programmer/examples/stm32g431-w25q128jv
-cargo build --release
-probe-rs run --chip STM32G431CBUx target/thumbv7em-none-eabihf/release/flash-content-viewer
-```
+
+   ```bash
+   cd /Users/ivan/Projects/Ivan/stm32g4-flash-programmer/examples/stm32g431-w25q128jv
+   cargo build --release
+   probe-rs run --chip STM32G431CBUx target/thumbv7em-none-eabihf/release/flash-content-viewer
+   ```
 
 2. **验证功能：**
    - 启动时应显示开屏图（3秒）
@@ -130,6 +133,7 @@ probe-rs run --chip STM32G431CBUx target/thumbv7em-none-eabihf/release/flash-con
 ## 🎯 **成功标准**
 
 烧录成功的标志：
+
 1. Flash信息查询返回正确的JEDEC ID (EF4018)
 2. 开屏图数据非全0xFF或全0x00
 3. 16px字体头部包含正确的字符数量

@@ -35,6 +35,7 @@ pre-commit:
         else
           echo "⚠️  markdownlint-cli2 not found. Install with: npm install -g markdownlint-cli2"
           echo "Skipping markdown check..."
+          exit 0
         fi
 
     # Check for common issues

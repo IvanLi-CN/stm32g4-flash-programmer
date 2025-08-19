@@ -23,6 +23,7 @@ A high-performance USB-based external flash programmer for STM32G4 microcontroll
 ## 📌 Pin Configuration
 
 ### ⚡ SPI Flash Connections (Critical!)
+
 - **SCK**: PB13 (SPI2_SCK)
 - **MISO**: PB14 (SPI2_MISO)
 - **MOSI**: PB15 (SPI2_MOSI)
@@ -31,6 +32,7 @@ A high-performance USB-based external flash programmer for STM32G4 microcontroll
 - **HOLD#**: PA10 (GPIO Output, pulled HIGH)
 
 ### 🔌 USB Connection
+
 - **USB D+**: PA12
 - **USB D-**: PA11
 
@@ -39,6 +41,7 @@ A high-performance USB-based external flash programmer for STM32G4 microcontroll
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 ```bash
 # Install Rust with embedded target
 rustup target add thumbv7em-none-eabihf
@@ -48,18 +51,21 @@ cargo install probe-rs --features cli
 ```
 
 ### 1. Build and Flash Firmware
+
 ```bash
 cd firmware
 cargo run --release
 ```
 
 ### 2. Build Host Tool
+
 ```bash
 cd host-tool
 cargo build --release
 ```
 
 ### 3. Test Connection
+
 ```bash
 ./target/release/flash-programmer-tool --port /dev/ttyACM0 info
 ```
@@ -67,11 +73,13 @@ cargo build --release
 ## 📖 Usage Examples
 
 ### 🔍 Get Flash Information
+
 ```bash
 flash-programmer-tool --port /dev/ttyACM0 info
 ```
 
 ### 📖 Read Flash Memory
+
 ```bash
 # Read 1KB from address 0x0
 flash-programmer-tool --port /dev/ttyACM0 read \
@@ -79,6 +87,7 @@ flash-programmer-tool --port /dev/ttyACM0 read \
 ```
 
 ### ✍️ Write Flash Memory (Recommended)
+
 ```bash
 # Write with automatic erase and verification
 flash-programmer-tool --port /dev/ttyACM0 write \
@@ -86,6 +95,7 @@ flash-programmer-tool --port /dev/ttyACM0 write \
 ```
 
 ### 🗑️ Erase Flash Sectors
+
 ```bash
 # Erase 4KB sector at address 0x0
 flash-programmer-tool --port /dev/ttyACM0 erase \
@@ -93,6 +103,7 @@ flash-programmer-tool --port /dev/ttyACM0 erase \
 ```
 
 ### 🎯 Advanced Usage
+
 ```bash
 # Write to specific address with basic mode
 flash-programmer-tool --port /dev/ttyACM0 write \
@@ -115,7 +126,8 @@ The recommended workflow for flash programming:
 ## 🛠️ Protocol Details
 
 ### Packet Structure
-```
+
+```text
 ┌─────────────┬─────────┬─────────┬─────────┬────────┬──────────┬─────────┐
 │ Magic (2B)  │ Seq(1B) │ Cmd(1B) │ Addr(3B)│ Len(1B)│ Data(nB) │ CRC(2B) │
 ├─────────────┼─────────┼─────────┼─────────┼────────┼──────────┼─────────┤
@@ -124,6 +136,7 @@ The recommended workflow for flash programming:
 ```
 
 ### Commands
+
 - **1**: Info - Get flash information
 - **2**: Erase - Erase flash sectors
 - **3**: Write - Write data to flash
@@ -133,16 +146,19 @@ The recommended workflow for flash programming:
 ## 🎯 Troubleshooting
 
 ### Connection Issues
+
 - Verify USB cable and port
 - Check that firmware is running (LED indicators)
 - Try different USB ports
 
 ### Write Failures
+
 - **Always erase before writing**: Use `--erase` flag
 - Check address alignment (4KB sectors)
 - Verify file size and available space
 
 ### Hardware Issues
+
 - Double-check pin connections (especially CS=PB12, WP#=PB11)
 - Ensure proper power supply (3.3V)
 - Check SPI signal integrity with oscilloscope
@@ -158,6 +174,7 @@ The recommended workflow for flash programming:
 ## 🧪 Testing
 
 The project includes comprehensive test files:
+
 ```bash
 # Test files in host-tool/
 test_write_debug.bin    # "Hello Flash Test 123\n"
@@ -166,9 +183,10 @@ test_read_*.bin         # Various read test results
 
 ## ✅ Project Status
 
-**🎉 FULLY FUNCTIONAL AND TESTED**
+### 🎉 FULLY FUNCTIONAL AND TESTED
 
 This project has been thoroughly tested and verified:
+
 - ✅ Hardware connections confirmed
 - ✅ SPI communication working
 - ✅ Write operations successful

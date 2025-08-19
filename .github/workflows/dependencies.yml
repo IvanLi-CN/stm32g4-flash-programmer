@@ -28,11 +28,11 @@ jobs:
       - name: Run cargo audit (main project)
         run: cargo audit
 
-      - name: Run cargo audit (flash_programmer)
-        run: cd flash_programmer && cargo audit
+      - name: Run cargo audit (host-tool)
+        run: cd host-tool && cargo audit
 
-      - name: Run cargo audit (flash_test_image)
-        run: cd flash_test_image && cargo audit
+      - name: Run cargo audit (firmware)
+        run: cd firmware && cargo audit
 
   outdated:
     name: Check Outdated Dependencies

@@ -5,26 +5,29 @@
 ### 环境准备
 
 1. **安装Rust工具链**
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup target add thumbv7em-none-eabihf
-```
+
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   rustup target add thumbv7em-none-eabihf
+   ```
 
 2. **安装调试工具**
-```bash
-cargo install probe-rs --features cli
-```
+
+   ```bash
+   cargo install probe-rs --features cli
+   ```
 
 3. **Python环境** (用于资源生成)
-```bash
-pip install pillow numpy
-```
+
+   ```bash
+   pip install pillow numpy
+   ```
 
 ### 硬件连接
 
 #### STM32G431CBU6 ↔ W25Q128JV 连接图
 
-```
+```text
 STM32G431CBU6          W25Q128JV Flash
 ┌─────────────┐       ┌─────────────┐
 │ PB12 (NSS)  │────── │ CS          │
@@ -225,7 +228,7 @@ echo 16384 | sudo tee /sys/module/usbcore/parameters/usbfs_memory_mb
 
 ### 通信协议
 
-```
+```text
 数据包格式:
 ┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
 │ Magic   │ Command │ Length  │ Address │ Data    │ CRC16   │

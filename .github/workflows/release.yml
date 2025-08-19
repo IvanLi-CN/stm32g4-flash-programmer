@@ -38,11 +38,11 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build flash_programmer release
-        run: cd flash_programmer && cargo build --release
+      - name: Build host-tool release
+        run: cd host-tool && cargo build --release
 
-      - name: Build flash_test_image release
-        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf --release
+      - name: Build firmware release
+        run: cd firmware && cargo build --target thumbv7em-none-eabihf --release
 
       - name: Build main project release
         run: cargo build --release

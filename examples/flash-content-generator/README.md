@@ -5,6 +5,7 @@ This directory contains tools and utilities for generating content to be stored 
 ## Overview
 
 The Flash Content Generator provides a complete toolchain for:
+
 - Converting fonts to bitmap format suitable for embedded displays
 - Generating boot screen images in RGB565 format
 - Creating Flash memory layouts and resource maps
@@ -13,7 +14,7 @@ The Flash Content Generator provides a complete toolchain for:
 
 ## Directory Structure
 
-```
+```text
 flash-content-generator/
 ├── tools/                  # Python scripts for content generation
 │   ├── font_converter.py   # Convert TTF fonts to bitmap format
@@ -108,20 +109,26 @@ cd web-app
 ## Tools Description
 
 ### font_converter.py
+
 Converts TTF fonts to bitmap format suitable for embedded displays. Supports:
+
 - Configurable font sizes
 - Character subset selection (ASCII, CJK, etc.)
 - Multiple output formats
 - Bitmap optimization
 
 ### svg_to_rgb565.py
+
 Converts SVG graphics to RGB565 binary format for boot screens:
+
 - Configurable output dimensions
 - RGB565 color space conversion
 - Optimized for embedded displays
 
 ### flash_composer.py
+
 Composes complete Flash images from multiple resources:
+
 - Font bitmaps
 - Boot screen images
 - Configuration data
@@ -129,13 +136,16 @@ Composes complete Flash images from multiple resources:
 - **Automatic web-app deployment** (copies firmware for preview)
 
 ### resource_manager.py
+
 Manages Flash memory layout and resource allocation:
+
 - Address calculation
 - Resource mapping
 - Layout validation
 - Memory usage optimization
 
 ### Web App Features
+
 - Upload and analyze font bitmap files
 - Character-by-character visualization
 - Bitmap data inspection
@@ -145,6 +155,7 @@ Manages Flash memory layout and resource allocation:
 ## Integration with STM32 Projects
 
 The generated content is designed to work with STM32 projects that:
+
 1. Use external SPI Flash memory (e.g., W25Q128JV)
 2. Have display controllers (e.g., ST7789)
 3. Implement Flash-based font rendering

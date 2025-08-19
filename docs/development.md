@@ -13,6 +13,7 @@ Run the setup script to install all necessary tools:
 ```
 
 This will install:
+
 - **commitlint** - Commit message format checking
 - **markdownlint-cli2** - Documentation quality checking
 - **lefthook** - Git hooks manager
@@ -32,7 +33,7 @@ This installs git hooks that will automatically run quality checks before commit
 
 We use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-```
+```text
 <type>[optional scope]: <description>
 
 [optional body]
@@ -41,7 +42,8 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) format:
 ```
 
 **Examples:**
-```
+
+```text
 feat(firmware): add W25Q128 flash support
 fix(host-tool): resolve serial communication timeout
 docs(readme): update installation instructions
@@ -49,6 +51,7 @@ chore(deps): update embassy to latest version
 ```
 
 **Allowed types:**
+
 - `feat` - New features
 - `fix` - Bug fixes
 - `docs` - Documentation changes
@@ -62,6 +65,7 @@ chore(deps): update embassy to latest version
 - `revert` - Revert previous commits
 
 **Allowed scopes:**
+
 - `core`, `config`, `wifi`, `mqtt`, `i2c`, `charge`, `protector`, `watchdog`
 - `bus`, `web-tool`, `ci`, `docs`, `tools`, `shell`, `firmware`, `deps`
 
@@ -85,6 +89,7 @@ We use markdownlint to ensure consistent documentation:
 ## Available Commands
 
 ### Build Commands
+
 ```bash
 make all          # Build all components (release)
 make dev          # Build all components (debug)
@@ -93,6 +98,7 @@ make test         # Run tests
 ```
 
 ### Quality Commands
+
 ```bash
 make quality      # Run all quality checks
 make check        # Run Rust clippy linting
@@ -102,6 +108,7 @@ make commit-check # Check commit message format
 ```
 
 ### Git Hooks Commands
+
 ```bash
 make hooks-install   # Install git hooks
 make hooks-uninstall # Remove git hooks
@@ -111,17 +118,22 @@ make hooks-run       # Run pre-commit hooks manually
 ## Git Hooks Workflow
 
 ### Pre-commit Hooks
+
 Automatically run before each commit:
+
 1. **Rust formatting check** - Ensures code is properly formatted
 2. **Rust linting** - Runs clippy to catch common issues
 3. **Markdown linting** - Checks documentation quality
 4. **Trailing whitespace check** - Removes trailing spaces
 
 ### Commit Message Hook
+
 Validates commit message format using commitlint.
 
 ### Pre-push Hooks
+
 Run before pushing to remote:
+
 1. **Tests** - Ensures all tests pass
 2. **Build check** - Verifies everything compiles
 
@@ -146,6 +158,7 @@ lefthook run pre-commit --commands rust-fmt
 ## Troubleshooting
 
 ### Git Hooks Not Running
+
 ```bash
 # Reinstall hooks
 make hooks-uninstall
@@ -153,20 +166,24 @@ make hooks-install
 ```
 
 ### Tool Not Found Errors
+
 ```bash
 # Run setup script again
 ./scripts/setup-dev-env.sh
 ```
 
 ### Commit Message Rejected
+
 Check the commit message format and ensure it follows the conventional commits standard.
 
 ### Markdown Linting Errors
+
 Run `make docs-check` to see specific issues and fix them according to the markdownlint rules.
 
 ## CI/CD Integration
 
 The same quality checks run automatically in GitHub Actions:
+
 - **Commit Check** - Validates commit messages in PRs
 - **Documentation Check** - Validates markdown files
 - **Rust Checks** - Formatting, linting, and testing

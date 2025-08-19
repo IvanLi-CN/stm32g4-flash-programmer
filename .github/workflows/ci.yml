@@ -35,17 +35,20 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run cargo check (main project)
-        run: cargo check
+      - name: Run cargo check (host-tool)
+        run: cd host-tool && cargo check
 
-      - name: Run cargo check (flash_programmer)
-        run: cd flash_programmer && cargo check
+      - name: Run cargo check (firmware)
+        run: cd firmware && cargo check --target thumbv7em-none-eabihf
 
-      - name: Run cargo check (flash_test_image)
-        run: cd flash_test_image && cargo check --target thumbv7em-none-eabihf
+      - name: Run cargo check (protocol)
+        run: cd protocol && cargo check
 
-      - name: Run cargo check (tests)
-        run: cargo check --tests
+      - name: Run cargo check (tests - host-tool)
+        run: cd host-tool && cargo check --tests
+
+      - name: Run cargo check (tests - protocol)
+        run: cd protocol && cargo check --tests
 
   test:
     name: Test Suite
@@ -68,8 +71,11 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run cargo test (main project)
-        run: cargo test
+      - name: Run cargo test (host-tool)
+        run: cd host-tool && cargo test
+
+      - name: Run cargo test (protocol)
+        run: cd protocol && cargo test
 
   lints:
     name: Lints
@@ -95,23 +101,23 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run cargo fmt (main project)
-        run: cargo fmt --all -- --check
+      - name: Run cargo fmt (host-tool)
+        run: cd host-tool && cargo fmt --all -- --check
 
-      - name: Run cargo fmt (flash_programmer)
-        run: cd flash_programmer && cargo fmt --all -- --check
+      - name: Run cargo fmt (firmware)
+        run: cd firmware && cargo fmt --all -- --check
 
-      - name: Run cargo fmt (flash_test_image)
-        run: cd flash_test_image && cargo fmt --all -- --check
+      - name: Run cargo fmt (protocol)
+        run: cd protocol && cargo fmt --all -- --check
 
-      - name: Run cargo clippy (main project)
-        run: cargo clippy -- -D warnings
+      - name: Run cargo clippy (host-tool)
+        run: cd host-tool && cargo clippy -- -D warnings
 
-      - name: Run cargo clippy (flash_programmer)
-        run: cd flash_programmer && cargo clippy -- -D warnings
+      - name: Run cargo clippy (firmware)
+        run: cd firmware && cargo clippy --target thumbv7em-none-eabihf -- -D warnings
 
-      - name: Run cargo clippy (flash_test_image)
-        run: cd flash_test_image && cargo clippy --target thumbv7em-none-eabihf -- -D warnings
+      - name: Run cargo clippy (protocol)
+        run: cd protocol && cargo clippy -- -D warnings
 
   build:
     name: Build
@@ -139,37 +145,37 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-build-${{ matrix.profile }}-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build main project debug
+      - name: Build host-tool debug
         if: matrix.profile == 'debug'
-        run: cargo build
+        run: cd host-tool && cargo build
 
-      - name: Build main project release
+      - name: Build host-tool release
         if: matrix.profile == 'release'
-        run: cargo build --release
+        run: cd host-tool && cargo build --release
 
-      - name: Build flash_programmer debug
+      - name: Build firmware debug
         if: matrix.profile == 'debug'
-        run: cd flash_programmer && cargo build
+        run: cd firmware && cargo build --target thumbv7em-none-eabihf
 
-      - name: Build flash_programmer release
+      - name: Build firmware release
         if: matrix.profile == 'release'
-        run: cd flash_programmer && cargo build --release
+        run: cd firmware && cargo build --target thumbv7em-none-eabihf --release
 
-      - name: Build flash_test_image debug
+      - name: Build protocol debug
         if: matrix.profile == 'debug'
-        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf
+        run: cd protocol && cargo build
 
-      - name: Build flash_test_image release
+      - name: Build protocol release
         if: matrix.profile == 'release'
-        run: cd flash_test_image && cargo build --target thumbv7em-none-eabihf --release
+        run: cd protocol && cargo build --release
 
       - name: Check binary size (release only)
         if: matrix.profile == 'release'
         run: |
           cargo install cargo-binutils
           rustup component add llvm-tools-preview
-          cd flash_programmer && cargo size --release --bin flash_programmer
-          cd ../flash_test_image && cargo size --target thumbv7em-none-eabihf --release --bin flash_test_image
+          cd host-tool && cargo size --release --bin flash-programmer-tool
+          cd ../firmware && cargo size --target thumbv7em-none-eabihf --release --bin firmware
 
   commit-check:
     name: Commit Convention Check

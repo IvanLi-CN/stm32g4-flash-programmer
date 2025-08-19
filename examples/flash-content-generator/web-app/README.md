@@ -36,12 +36,23 @@ A bitmap font data visualization and analysis tool specifically designed for STM
 
 ### 1. Prepare Data File
 
-Extract font data from W25Q128JV chip using STM32G4 Flash programmer:
+Extract font data from W25Q128JV chip using the STM32G4 Flash Programmer tool:
 
 ```bash
-./flash-programmer-tool --port /dev/ttyUSB0 read \
-  --file font_bitmap_extracted.bin \
-  --address 0x20000 --size 0x200000
+# Extract 12px font data (1MB)
+flash-programmer-tool --port /dev/ttyACM0 read \
+  --file font_bitmap_12px_extracted.bin \
+  --address 0x020000 --size 0x100000
+
+# Extract 16px font data (1MB)
+flash-programmer-tool --port /dev/ttyACM0 read \
+  --file font_bitmap_16px_extracted.bin \
+  --address 0x120000 --size 0x100000
+
+# Extract boot screen (110KB)
+flash-programmer-tool --port /dev/ttyACM0 read \
+  --file boot_screen_extracted.bin \
+  --address 0x000000 --size 0x1AE00
 ```
 
 ### 2. Open Web Application

@@ -248,7 +248,14 @@ def main():
     print(f"📁 Complete flash image: {output_path}")
     print(f"📏 Size: 16 MB (16,777,216 bytes)")
     print()
-    print("💡 Flash image ready for programming with your preferred tool.")
+    print("💡 Programming commands:")
+    print("   # Program complete image (recommended)")
+    print("   flash-programmer-tool --port /dev/ttyACM0 write \\")
+    print(f"     --file {os.path.basename(output_path)} --address 0x000000 --erase --verify")
+    print()
+    print("   # Verify flash information")
+    print("   flash-programmer-tool --port /dev/ttyACM0 info")
+    print()
     print("🌐 Web preview available at: web-app/index.html")
 
     return 0

@@ -67,15 +67,31 @@ Resource: reserved
 Flash Programming Commands:
 ===========================
 
-# Program boot_screen
-st-flash write boot_screen_320x172.bin 0x00000000
-
-# Program 12px font_bitmap
-st-flash write font_output/font_bitmap_12px.bin 0x00020000
-
-# Program 16px font_bitmap
-st-flash write font_output/font_bitmap_16px.bin 0x00120000
-
 # Program complete flash image (recommended)
-st-flash write w25q128jv_complete.bin 0x00000000
+flash-programmer-tool --port /dev/ttyACM0 write \
+  --file w25q128jv_complete.bin --address 0x000000 --erase --verify
+
+# Program individual resources (advanced users)
+# Boot screen
+flash-programmer-tool --port /dev/ttyACM0 write \
+  --file boot_screen_320x172.bin --address 0x000000 --erase --verify
+
+# 12px font bitmap
+flash-programmer-tool --port /dev/ttyACM0 write \
+  --file font_output/font_bitmap_12px.bin --address 0x020000 --erase --verify
+
+# 16px font bitmap
+flash-programmer-tool --port /dev/ttyACM0 write \
+  --file font_output/font_bitmap_16px.bin --address 0x120000 --erase --verify
+
+# Verification commands
+# Check flash information
+flash-programmer-tool --port /dev/ttyACM0 info
+
+# Read back and verify specific sections
+flash-programmer-tool --port /dev/ttyACM0 read \
+  --file boot_screen_verify.bin --address 0x000000 --size 0x1AE00
+
+flash-programmer-tool --port /dev/ttyACM0 read \
+  --file font_12px_verify.bin --address 0x020000 --size 0x100000
 

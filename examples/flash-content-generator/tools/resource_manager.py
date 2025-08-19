@@ -93,14 +93,31 @@ class W25Q128JVResourceManager:
             # Programming commands
             f.write("Flash Programming Commands:\n")
             f.write("===========================\n\n")
+            f.write("# Program complete flash image (recommended)\n")
+            f.write("flash-programmer-tool --port /dev/ttyACM0 write \\\n")
+            f.write("  --file w25q128jv_complete.bin --address 0x000000 --erase --verify\n\n")
+
             for resource in self.resources:
-                if resource['name'] in ['boot_screen', 'font_bitmap']:
+                if resource['name'] in ['boot_screen', 'font_bitmap_12px', 'font_bitmap_16px']:
                     if resource['name'] == 'boot_screen':
                         filename = "boot_screen_320x172.bin"
-                    elif resource['name'] == 'font_bitmap':
-                        filename = "font_output/font_bitmap.bin"
+                    elif resource['name'] == 'font_bitmap_12px':
+                        filename = "font_output/font_bitmap_12px.bin"
+                    elif resource['name'] == 'font_bitmap_16px':
+                        filename = "font_output/font_bitmap_16px.bin"
+                    else:
+                        continue
+
                     f.write(f"# Program {resource['name']}\n")
-                    f.write(f"st-flash write {filename} 0x{resource['address']:08X}\n\n")
+                    f.write(f"flash-programmer-tool --port /dev/ttyACM0 write \\\n")
+                    f.write(f"  --file {filename} --address 0x{resource['address']:08X} --erase --verify\n\n")
+
+            f.write("# Verification commands\n")
+            f.write("# Check flash information\n")
+            f.write("flash-programmer-tool --port /dev/ttyACM0 info\n\n")
+            f.write("# Read back and verify specific sections\n")
+            f.write("flash-programmer-tool --port /dev/ttyACM0 read \\\n")
+            f.write("  --file boot_screen_verify.bin --address 0x000000 --size 0x1AE00\n\n")
     
     def generate_resource_table(self, output_path):
         """Generate JSON resource table"""

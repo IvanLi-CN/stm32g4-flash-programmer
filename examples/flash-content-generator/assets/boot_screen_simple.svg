@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="320" height="172" viewBox="0 0 320 172" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pink gradient background -->
+  <defs>
+    <linearGradient id="pinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fdf2f8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#fce7f3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fbcfe8;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Shadow filter for depth -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="320" height="172" fill="url(#pinkGradient)"/>
+
+  <!-- Central LOGO -->
+  <g transform="translate(160, 86)" filter="url(#shadow)">
+    <!-- Outer decorative ring -->
+    <circle cx="0" cy="0" r="65" fill="none" stroke="#ec4899" stroke-width="1" opacity="0.3"/>
+
+    <!-- Main background circle with gradient -->
+    <circle cx="0" cy="0" r="55" fill="#ffffff" opacity="0.95"/>
+    <circle cx="0" cy="0" r="55" fill="none" stroke="#ec4899" stroke-width="3"/>
+
+    <!-- Inner decorative elements -->
+    <circle cx="0" cy="0" r="48" fill="none" stroke="#f9a8d4" stroke-width="1" opacity="0.5"/>
+
+    <!-- USB PD text at top with better styling -->
+    <text x="0" y="-18" text-anchor="middle"
+          font-family="Arial, sans-serif" font-size="16" fill="#be185d" font-weight="bold" letter-spacing="1px">
+      USB PD
+    </text>
+
+    <!-- Refined USB connector icon -->
+    <g stroke="#be185d" stroke-width="2" fill="none">
+      <!-- Main connector body -->
+      <rect x="-16" y="-6" width="32" height="12" rx="3"/>
+      <!-- Connector pins -->
+      <rect x="-12" y="-3" width="24" height="6" rx="1"/>
+      <!-- Side details -->
+      <line x1="-16" y1="-2" x2="-18" y2="-2"/>
+      <line x1="-16" y1="2" x2="-18" y2="2"/>
+      <line x1="16" y1="-2" x2="18" y2="-2"/>
+      <line x1="16" y1="2" x2="18" y2="2"/>
+    </g>
+
+    <!-- SINK text at bottom with better styling -->
+    <text x="0" y="30" text-anchor="middle"
+          font-family="Arial, sans-serif" font-size="18" fill="#be185d" font-weight="bold" letter-spacing="2px">
+      SINK
+    </text>
+
+    <!-- Small decorative dots -->
+    <circle cx="-35" cy="0" r="2" fill="#f9a8d4" opacity="0.6"/>
+    <circle cx="35" cy="0" r="2" fill="#f9a8d4" opacity="0.6"/>
+  </g>
+</svg>

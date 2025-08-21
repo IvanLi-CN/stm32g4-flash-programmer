@@ -100,8 +100,8 @@ async fn main(_spawner: Spawner) {
     // SPI2 pins for external Flash (based on actual hardware configuration)
     // SCK: PB13, MISO: PB14, MOSI: PB15, CS: PA8 (assumed)
     let mut spi_config = SpiConfig::default();
-    spi_config.frequency = embassy_stm32::time::Hertz(500_000); // 500kHz SPI clock (slower for reliability)
-                                                                // SPI Mode 0 for W25Q128 (CPOL=0, CPHA=0) - this is the default mode
+    spi_config.frequency = embassy_stm32::time::Hertz(20_000_000); // 20MHz SPI clock (high performance, W25Q128JV supports up to 133MHz)
+                                                                   // SPI Mode 0 for W25Q128 (CPOL=0, CPHA=0) - this is the default mode
     let spi = Spi::new(
         p.SPI2, p.PB13,     // SCK
         p.PB15,     // MOSI

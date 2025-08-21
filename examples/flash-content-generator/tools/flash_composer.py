@@ -85,7 +85,9 @@ class FlashComposer:
             file_mapping = {
                 'boot_screen': 'boot_screen_320x172.bin',
                 'font_bitmap_12px': 'font_output/font_bitmap_12px.bin',
-                'font_bitmap_16px': 'font_output/font_bitmap_16px.bin'
+                'font_bitmap_16px': 'font_output/font_bitmap_16px.bin',
+                'arial_font_16x24': 'font_output/arial_font_16x24.bin',
+                'grotesk_font_24x48': 'font_output/grotesk_font_24x48.bin'
             }
             
             if name in file_mapping:
@@ -209,7 +211,7 @@ def main():
     # Get script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     assets_dir = os.path.join(os.path.dirname(script_dir), 'assets')
-    output_dir = os.path.dirname(script_dir)
+    output_dir = assets_dir  # 修改：将固件生成到assets目录
     
     print("🔧 W25Q128JV Flash Composer")
     print("=" * 50)

@@ -7,7 +7,93 @@ Converts TTF fonts to bitmap format for embedded systems
 import os
 import sys
 import struct
+import subprocess
 from PIL import Image, ImageDraw, ImageFont
+
+
+def generate_custom_fonts(output_dir):
+    """Generate custom monospace fonts using the custom font generator"""
+    print("🎨 Generating custom monospace fonts...")
+
+    try:
+        # Get the directory of this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        custom_generator_path = os.path.join(script_dir, "custom_font_generator.py")
+
+        if not os.path.exists(custom_generator_path):
+            print(f"❌ Custom font generator not found: {custom_generator_path}")
+            return False
+
+        # Run the custom font generator
+        cmd = [sys.executable, custom_generator_path, "--output-dir", output_dir]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print("✅ Custom fonts generated successfully!")
+            print(result.stdout)
+            return True
+        else:
+            print("❌ Custom font generation failed!")
+            print(result.stderr)
+            return False
+
+    except Exception as e:
+        print(f"❌ Error generating custom fonts: {e}")
+        return False
+
+
+def convert_c_array_fonts(output_dir):
+    """Convert C array format fonts to binary format"""
+    print("🔄 Converting C array fonts...")
+
+    try:
+        # Get the directory of this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_dir = os.path.join(os.path.dirname(script_dir), 'assets')
+        converter_path = os.path.join(script_dir, "c_array_font_converter.py")
+
+        if not os.path.exists(converter_path):
+            print(f"❌ C array font converter not found: {converter_path}")
+            return False
+
+        # Define C array font files to convert
+        c_fonts = [
+            {
+                'input': os.path.join(assets_dir, 'Arial_round_16x24.c'),
+                'output': os.path.join(output_dir, 'arial_font_16x24.bin'),
+                'name': 'Arial 16x24'
+            },
+            {
+                'input': os.path.join(assets_dir, 'GroteskBold24x48.c'),
+                'output': os.path.join(output_dir, 'grotesk_font_24x48.bin'),
+                'name': 'Grotesk Bold 24x48'
+            }
+        ]
+
+        success_count = 0
+        for font_info in c_fonts:
+            if not os.path.exists(font_info['input']):
+                print(f"⚠️  C array font not found: {font_info['input']}")
+                continue
+
+            print(f"📝 Converting {font_info['name']}...")
+            cmd = [sys.executable, converter_path, font_info['input'], font_info['output'], '-v']
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                print(f"✅ {font_info['name']} converted successfully!")
+                success_count += 1
+            else:
+                print(f"❌ Failed to convert {font_info['name']}")
+                print(result.stderr)
+
+        print(f"📊 Converted {success_count}/{len(c_fonts)} C array fonts")
+        return success_count > 0
+
+    except Exception as e:
+        print(f"❌ Error converting C array fonts: {e}")
+        return False
+
 
 def convert_font_to_bitmap(font_path, output_dir, font_size=12, output_filename="font_bitmap.bin"):
     """Convert TTF font to bitmap format for embedded systems"""
@@ -307,10 +393,26 @@ def main():
     else:
         print("❌ 16px font conversion failed!")
 
-    print(f"\n📊 Conversion Summary:")
-    print(f"   Fonts converted: {success_count}/2")
+    # Generate custom fonts
+    print(f"\n🎨 Generating custom monospace fonts...")
+    if generate_custom_fonts(output_dir):
+        print("✅ Custom fonts generation completed successfully!")
+        success_count += 1
+    else:
+        print("❌ Custom fonts generation failed!")
 
-    if success_count == 2:
+    # Convert C array fonts
+    print(f"\n🔄 Converting C array fonts...")
+    if convert_c_array_fonts(output_dir):
+        print("✅ C array fonts conversion completed successfully!")
+        success_count += 1
+    else:
+        print("❌ C array fonts conversion failed!")
+
+    print(f"\n📊 Conversion Summary:")
+    print(f"   Fonts converted: {success_count}/4")
+
+    if success_count == 4:
         print("🎉 All font conversions completed successfully!")
         print("Bitmap fonts are ready for flash programming.")
         print("Use the addresses from memory_map.txt for programming.")

@@ -8,11 +8,11 @@
   },
   "memory_usage": {
     "total_bytes": 16777216,
-    "used_bytes": 16756224,
-    "free_bytes": 20992,
-    "usage_percent": 99.8748779296875,
+    "used_bytes": 8216576,
+    "free_bytes": 8560640,
+    "usage_percent": 48.97,
     "total_sectors": 4096,
-    "used_sectors": 4091
+    "used_sectors": 2006
   },
   "resources": [
     {
@@ -2051,23 +2051,39 @@
         1999
       ]
     },
+
     {
-      "name": "reserved",
+      "name": "arial_font_16x24",
       "address": 8192000,
-      "size": 8585216,
-      "end_address": 16777215,
-      "description": "Reserved for future use",
+      "size": 8192,
+      "end_address": 8200191,
+      "description": "Arial 16x24 font (32-95)",
       "sectors": [
         2000,
-        2001,
+        2001
+      ]
+    },
+    {
+      "name": "grotesk_font_24x48",
+      "address": 8200192,
+      "size": 16384,
+      "end_address": 8216575,
+      "description": "Grotesk Bold 24x48 font (32-95)",
+      "sectors": [
         2002,
         2003,
         2004,
-        2005,
+        2005
+      ]
+    },
+    {
+      "name": "reserved",
+      "address": 8216576,
+      "size": 8560640,
+      "end_address": 16777215,
+      "description": "Reserved for future use",
+      "sectors": [
         2006,
-        2007,
-        2008,
-        2009,
         2010,
         2011,
         2012,

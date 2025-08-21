@@ -1,10 +1,25 @@
-# Flash Bitmap Font Analyzer
+# STM32G431CBU6 Flash Resource Viewer
 
 ⚠️ **重要说明**：这是一个**Flash资源预览器**，仅用于可视化查看Flash内容，**不支持烧录功能**。如需烧录Flash内容，请使用项目根目录下的CLI工具。
 
 ## 🎯 Project Overview
 
-A bitmap font data visualization and analysis tool specifically designed for STM32G4 W25Q128JV Flash chips. It can parse font bitmap data extracted from Flash memory and provides an intuitive visual interface to view and verify character bitmaps.
+A comprehensive Flash resource visualization and analysis tool specifically designed for STM32G431CBU6 PD-Sink project. It can parse font bitmap data, images, and firmware from W25Q128JV Flash memory, providing an intuitive visual interface to view and verify all embedded resources.
+
+## 🆕 Latest Updates (2025-01-20)
+
+### ✨ New Font Support
+
+- **24×48 Digital Font**: High-resolution digits for voltage/current/power display
+- **16×24 ASCII Font**: Complete ASCII character set for menus and labels
+- **Auto Firmware Loading**: Supports latest `pd-sink-128mbit.bin` firmware
+
+### 🔧 Enhanced Features
+
+- Smart font type detection
+- Memory layout visualization
+- Real-time font switching
+- Complete character information display
 
 ## ✨ Key Features
 
@@ -74,29 +89,50 @@ Open the `index.html` file in your browser
 - Use zoom controls to adjust display size
 - Click export button to save character images
 
-## 📊 Supported Character Types
+## 📊 Supported Font Types
 
-### 🔢 Digits (0-9)
+### 🔤 Traditional Fonts
+
+- **12px Chinese Font**: Traditional Chinese character bitmap
+- **16px Chinese Font**: Larger Chinese character display
+
+### 🆕 Custom Fonts (New!)
+
+- **24×48 Digital Font**:
+  - Characters: 0-9, -, . (12 characters)
+  - Address: 0x7D0000
+  - Size: 1,852 bytes
+  - Usage: Voltage, current, power display
+
+- **16×24 ASCII Font**:
+  - Characters: ASCII 32-126 (95 characters)
+  - Address: 0x7D1000
+  - Size: 5,514 bytes
+  - Usage: Menus, labels, status text
+
+### 📊 Character Categories
+
+#### 🔢 Digits (0-9)
 
 - Unicode range: U+0030 - U+0039
 - Contains all Arabic numerals
 
-### 🔠 Uppercase Letters (A-Z)
+#### 🔠 Uppercase Letters (A-Z)
 
 - Unicode range: U+0041 - U+005A
 - Contains all English uppercase letters
 
-### 🔡 Lowercase Letters (a-z)
+#### 🔡 Lowercase Letters (a-z)
 
 - Unicode range: U+0061 - U+007A
 - Contains all English lowercase letters
 
-### 🀄 Chinese Characters
+#### 🀄 Chinese Characters
 
 - Unicode range: U+4E00 - U+9FFF
 - Contains common Chinese characters and extensions
 
-### 🔣 Symbols
+#### 🔣 Symbols
 
 - Various punctuation marks and special characters
 - ASCII symbol range

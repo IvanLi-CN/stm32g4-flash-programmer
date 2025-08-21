@@ -12,11 +12,17 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-weight: 500;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100vh;
             padding: 20px;
             overflow: hidden;
+            color: #2c3e50;
+            line-height: 1.6;
+            letter-spacing: 0.3px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -38,10 +44,27 @@
             text-align: center;
         }
 
+        /* 通用标题样式 */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        h1 { font-size: 2.2rem; font-weight: 700; }
+        h2 { font-size: 1.8rem; }
+        h3 { font-size: 1.4rem; }
+        h4 { font-size: 1.2rem; }
+
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: white;
         }
 
         .resource-tabs {
@@ -61,6 +84,11 @@
             cursor: pointer;
             transition: all 0.3s ease;
             backdrop-filter: blur(10px);
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(255,255,255,0.1);
+            margin: 0 8px;
         }
 
         .tab-btn:hover {
@@ -471,17 +499,19 @@
         .char-item {
             background: white;
             border: 1px solid #e9ecef;
-            border-radius: 6px;
-            padding: 10px;
+            border-radius: 8px;
+            padding: 12px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 80px;
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            font-weight: 500;
         }
 
         .char-item:hover {
@@ -501,8 +531,8 @@
             margin-bottom: 8px;
             background: transparent;
             display: flex;
-            align-items: flex-end;
-            justify-content: flex-start;
+            align-items: center;
+            justify-content: center;
             position: relative;
         }
 
@@ -514,8 +544,11 @@
         }
 
         .char-info {
-            font-size: 0.8em;
-            color: #666;
+            font-size: 0.85em;
+            color: #6c757d;
+            font-weight: 500;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', 'Monaco', 'Consolas', monospace;
+            letter-spacing: 0.3px;
         }
 
         .char-unicode {
@@ -683,6 +716,14 @@
             border-left-color: #45b7d1;
         }
 
+        .memory-block.digit-font-24x48 {
+            border-left-color: #f39c12;
+        }
+
+        .memory-block.ascii-font-16x24 {
+            border-left-color: #9b59b6;
+        }
+
         .block-info {
             flex: 1;
         }
@@ -784,6 +825,14 @@
                         <div class="font-option">
                             <input type="radio" id="font16px" name="fontType" value="16px">
                             <label for="font16px">16px 字体</label>
+                        </div>
+                        <div class="font-option">
+                            <input type="radio" id="fontArial" name="fontType" value="arial">
+                            <label for="fontArial">🅰️ Arial 16×24字体</label>
+                        </div>
+                        <div class="font-option">
+                            <input type="radio" id="fontGrotesk" name="fontType" value="grotesk">
+                            <label for="fontGrotesk">🅱️ Grotesk Bold 24×48字体</label>
                         </div>
                     </div>
                 </div>

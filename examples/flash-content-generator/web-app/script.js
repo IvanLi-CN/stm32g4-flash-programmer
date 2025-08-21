@@ -201,8 +201,13 @@ class FlashResourceViewer {
 
     async loadDefaultFirmware() {
         try {
-            // 尝试加载默认固件文件
-            const response = await fetch('./w25q128jv_complete.bin');
+            // 优先尝试加载最新的固件文件
+            let response = await fetch('./w25q128jv_complete.bin');
+            if (!response.ok) {
+                // 如果最新固件不存在，尝试加载旧版本
+                response = await fetch('./pd-sink-128mbit.bin');
+            }
+
             if (response.ok) {
                 const arrayBuffer = await response.arrayBuffer();
                 this.firmwareData = new Uint8Array(arrayBuffer);
@@ -249,6 +254,24 @@ class FlashResourceViewer {
                 description: '16px字体位图'
             };
 
+            // 新增：Arial字体
+            const arialFontBlock = {
+                name: 'arial_font_16x24',
+                address: 0x7D0000,
+                size: 3716,
+                type: 'font',
+                description: 'Arial 16×24字体 (32-95)'
+            };
+
+            // 新增：Grotesk字体
+            const groteskFontBlock = {
+                name: 'grotesk_font_24x48',
+                address: 0x7D2000,
+                size: 9860,
+                type: 'font',
+                description: 'Grotesk Bold 24×48字体 (32-95)'
+            };
+
             // 加载图片数据
             const imageData = this.firmwareData.slice(imageBlock.address, imageBlock.address + imageBlock.size);
             this.imageData = imageData;
@@ -261,6 +284,14 @@ class FlashResourceViewer {
             const font16pxData = this.firmwareData.slice(font16pxBlock.address, font16pxBlock.address + font16pxBlock.size);
             this.font16pxData = font16pxData;
 
+            // 加载Arial字体数据
+            const arialFontData = this.firmwareData.slice(arialFontBlock.address, arialFontBlock.address + arialFontBlock.size);
+            this.arialFontData = arialFontData;
+
+            // 加载Grotesk字体数据
+            const groteskFontData = this.firmwareData.slice(groteskFontBlock.address, groteskFontBlock.address + groteskFontBlock.size);
+            this.groteskFontData = groteskFontData;
+
             // 默认显示12px字体
             this.fontData = font12pxData;
             this.currentFontType = '12px';
@@ -269,7 +300,7 @@ class FlashResourceViewer {
             this.updateFontUI();
             this.filterAndDisplayCharacters();
 
-            this.showMessage(`已自动加载资源: 启动画面 + 12px(${this.characters.length}字符) + 16px字体！`, 'success');
+            this.showMessage(`已自动加载资源: 启动画面 + 12px(${this.characters.length}字符) + 16px字体 + Arial字体 + Grotesk字体！`, 'success');
         } catch (error) {
             console.error('自动加载资源失败:', error);
             this.showMessage('已加载默认固件，可以点击内存块预览内容', 'success');
@@ -437,7 +468,9 @@ class FlashResourceViewer {
         const memoryLayout = [
             { name: 'boot_screen', address: 0x00000000, size: 110080, type: 'image', description: '启动画面 (320×172 RGB565)' },
             { name: 'font_bitmap_12px', address: 0x00020000, size: 1048576, type: 'font', description: '12px字体位图' },
-            { name: 'font_bitmap_16px', address: 0x00120000, size: 1048576, type: 'font', description: '16px字体位图' }
+            { name: 'font_bitmap_16px', address: 0x00120000, size: 1048576, type: 'font', description: '16px字体位图' },
+            { name: 'arial_font_16x24', address: 0x7D0000, size: 3716, type: 'font', description: 'Arial 16×24字体 (32-95)' },
+            { name: 'grotesk_font_24x48', address: 0x7D2000, size: 9860, type: 'font', description: 'Grotesk Bold 24×48字体 (32-95)' }
         ];
 
         const memoryBlocks = document.getElementById('memoryBlocks');
@@ -485,17 +518,25 @@ class FlashResourceViewer {
             // 切换到字体预览模式
             this.currentResourceType = 'font';
             document.querySelector('[data-type="font"]').click();
-            
+
             if (block.name.includes('12px')) {
                 this.currentFontType = '12px';
                 document.getElementById('font12px').checked = true;
                 this.font12pxData = resourceData;
-            } else {
+            } else if (block.name.includes('16px')) {
                 this.currentFontType = '16px';
                 document.getElementById('font16px').checked = true;
                 this.font16pxData = resourceData;
+            } else if (block.name.includes('arial_font')) {
+                this.currentFontType = 'arial';
+                document.getElementById('fontArial').checked = true;
+                this.arialFontData = resourceData;
+            } else if (block.name.includes('grotesk_font')) {
+                this.currentFontType = 'grotesk';
+                document.getElementById('fontGrotesk').checked = true;
+                this.groteskFontData = resourceData;
             }
-            
+
             this.fontData = resourceData;
             this.parseFont();
             this.updateFontUI();
@@ -620,10 +661,33 @@ class FlashResourceViewer {
     }
 
     switchFont() {
-        const targetData = this.currentFontType === '12px' ? this.font12pxData : this.font16pxData;
+        let targetData;
+        let fontName;
+
+        switch (this.currentFontType) {
+            case '12px':
+                targetData = this.font12pxData;
+                fontName = '12px 字体';
+                break;
+            case '16px':
+                targetData = this.font16pxData;
+                fontName = '16px 字体';
+                break;
+            case 'arial':
+                targetData = this.arialFontData;
+                fontName = 'Arial 16×24字体';
+                break;
+            case 'grotesk':
+                targetData = this.groteskFontData;
+                fontName = 'Grotesk Bold 24×48字体';
+                break;
+            default:
+                targetData = this.font12pxData;
+                fontName = '12px 字体';
+        }
 
         if (!targetData) {
-            this.showMessage(`请先加载 ${this.currentFontType} 字体文件`, 'error');
+            this.showMessage(`请先加载 ${fontName} 文件`, 'error');
             return;
         }
 
@@ -632,7 +696,7 @@ class FlashResourceViewer {
         this.updateFontUI();
         this.filterAndDisplayCharacters();
 
-        this.showMessage(`已切换到 ${this.currentFontType} 字体`, 'success');
+        this.showMessage(`已切换到 ${fontName}`, 'success');
     }
 
     updateFontDisplay() {
@@ -828,7 +892,7 @@ class FlashResourceViewer {
         // 创建canvas，尺寸完全匹配字符位图
         const canvas = document.createElement('canvas');
         canvas.className = 'char-canvas';
-        const scale = 2;
+        const scale = 1;  // 使用1倍缩放显示实际字形大小
         canvas.width = char.width * scale;
         canvas.height = char.height * scale;
 

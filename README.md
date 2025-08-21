@@ -219,7 +219,9 @@ stm32g4-flash-programmer/
 ### Examples Directory
 
 - **`examples/stm32g431-w25q128jv/`**: Complete STM32G431 firmware example that reads font bitmaps from external Flash and displays them on an ST7789 TFT screen with vertical baseline alignment
-- **`examples/flash-content-generator/`**: Python tools and web applications for generating Flash content including fonts, images, and resource layouts
+- **`examples/flash-content-generator/`**: Python tools and web-based **preview applications** for generating and visualizing Flash content including fonts, images, and resource layouts
+
+> **Note**: The web application in `flash-content-generator/web-app/` is a **preview tool only** and does not support Flash programming. Use the CLI tool in `host-tool/` for actual Flash programming operations.
 
 ## 📄 License
 

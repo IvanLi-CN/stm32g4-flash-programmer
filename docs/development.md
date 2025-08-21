@@ -80,6 +80,20 @@ We use markdownlint to ensure consistent documentation:
 - Fenced code blocks must specify language
 - Images must have alt text
 
+### Tool Classification Standards
+
+To avoid user confusion, clearly distinguish between different tool types:
+
+- **Programming Tools**: Tools that can write/erase Flash memory (e.g., CLI tools with hardware interfaces)
+- **Preview/Analysis Tools**: Tools that only read and visualize data (e.g., web applications, viewers)
+- **Generation Tools**: Tools that create data files but don't interact with hardware
+
+**Documentation Requirements**:
+
+- Always specify tool capabilities and limitations upfront
+- Use clear warnings when tools do NOT support certain operations
+- Avoid ambiguous terms like "interface" or "application" without context
+
 ### Rust Code Standards
 
 - **Formatting**: Use `cargo fmt` (enforced by rustfmt)

@@ -34,12 +34,11 @@ cd /Users/ivan/Projects/Ivan/stm32g4-flash-programmer/host-tool
 - 需要足够的超时时间
 - 可能需要多次尝试
 
-#### **方法2：使用Web界面（推荐）**
+#### **注意：Web应用仅用于预览**
 
-1. 打开Web应用：`file:///Users/ivan/Projects/Ivan/stm32g4-flash-programmer/examples/flash-content-generator/web-app/index.html`
-2. 连接到设备（选择正确的串口）
-3. 加载 `w25q128jv_complete.bin` 文件
-4. 开始烧录过程
+⚠️ **重要说明**：`examples/flash-content-generator/web-app/` 目录下的Web应用是**Flash资源预览器**，仅用于可视化查看Flash内容（字体、图片等），**不支持烧录功能**。
+
+如需烧录Flash内容，请使用上述CLI工具方法。
 
 ### **步骤3：验证烧录结果**
 
@@ -80,8 +79,8 @@ cd /Users/ivan/Projects/Ivan/stm32g4-flash-programmer/host-tool
 
 2. **擦除超时**
    - 增加超时时间到300秒或更长
-   - 使用Web界面进行烧录
    - 分块烧录而不是整体烧录
+   - 重新尝试CLI工具烧录
 
 3. **验证失败**
    - 检查文件完整性

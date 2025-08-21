@@ -1,5 +1,7 @@
 # Flash Bitmap Font Analyzer
 
+⚠️ **重要说明**：这是一个**Flash资源预览器**，仅用于可视化查看Flash内容，**不支持烧录功能**。如需烧录Flash内容，请使用项目根目录下的CLI工具。
+
 ## 🎯 Project Overview
 
 A bitmap font data visualization and analysis tool specifically designed for STM32G4 W25Q128JV Flash chips. It can parse font bitmap data extracted from Flash memory and provides an intuitive visual interface to view and verify character bitmaps.
